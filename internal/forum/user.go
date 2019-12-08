@@ -2,6 +2,7 @@ package forum
 
 import (
 	"database/sql"
+	"errors"
 	"github.com/BarniBl/DB-HW/internal/input"
 )
 
@@ -69,10 +70,8 @@ func (us *UserService) SelectUserByNickName(nickName string) (userSl []input.Use
 
 func (us *UserService) InsertUser(user input.User) error {
 	sqlQuery := `INSERT INTO public.user (nick_name,email,full_name,about)
-	VALUES ($1,$2,$3,$4)
-	returning nick_name`
-	var nickName string
-	err := us.db.QueryRow(sqlQuery, user.NickName, user.Email, user.FullName, user.About).Scan(&nickName)
+	VALUES ($1,$2,$3,$4)`
+	_, err := us.db.Exec(sqlQuery, user.NickName, user.Email, user.FullName, user.About)
 	if err != nil {
 		return err
 	}
@@ -88,6 +87,35 @@ func (us *UserService) UpdateUser(user input.User) error {
 	_, err := us.db.Exec(sqlQuery, user.Email, user.FullName, user.About, user.NickName)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func (us *UserService) CheckUser(nickName string) (er error) {
+	sqlQuery := `SELECT count(*)
+	FROM public.user as u 
+	where u.nick_name = $1`
+	rows, err := us.db.Query(sqlQuery, nickName)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err := rows.Close(); err != nil {
+			er = err
+		}
+	}()
+
+	count := 0
+	for rows.Next() {
+		err := rows.Scan(&count)
+		if err != nil {
+			return err
+		}
+	}
+
+	if count != 1 {
+		return errors.New("хрень с количеством юзеров")
 	}
 	return nil
 }
