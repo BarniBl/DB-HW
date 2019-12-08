@@ -32,6 +32,8 @@ func main() {
 
 	e := echo.New()
 	e.POST("/user/:nickname/create", user.CreateUser)
+	e.GET("/user/:nickname/profile", user.GetProfile)
+	e.POST("/user/:nickname/profile", user.EditProfile)
 
 	e.Logger.Warnf("start listening on %s", host)
 	if err := e.Start(host); err != nil {
