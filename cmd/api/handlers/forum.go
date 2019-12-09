@@ -95,5 +95,24 @@ func (h *Forum) CreateThread(ctx echo.Context) (Err error) {
 		return ctx.JSON(http.StatusConflict, output.ErrorMessage{Message: "Error"})
 	}
 
-	return ctx.JSON(http.StatusConflict, threadSlice[0])
+	return ctx.JSON(http.StatusCreated, threadSlice[0])
+}
+
+func (h *Forum) GetForumDetails(ctx echo.Context) error {
+	slug := ctx.Param("slug")
+	if slug == "" {
+		return ctx.JSON(http.StatusBadRequest, output.ErrorMessage{Message: "Error"})
+	}
+
+	forumSlice, err := h.ForumService.SelectForumBySlug(slug)
+	if err != nil {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusBadRequest, output.ErrorMessage{Message: "Error"})
+	}
+	if len(forumSlice) != 1 {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+	}
+
+	return ctx.JSON(http.StatusOK, forumSlice[0])
 }
