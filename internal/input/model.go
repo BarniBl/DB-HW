@@ -1,5 +1,7 @@
 package input
 
+import "time"
+
 type User struct {
 	About    string `json:"about"`
 	Email    string `json:"email"`
@@ -13,4 +15,15 @@ type Forum struct {
 	User    string `json:"user"`
 	Posts   int    `json:"posts"`
 	Threads int    `json:"threads"`
+}
+
+type Thread struct {
+	Author  string    `json:"author"`
+	Created time.Time `json:"created"`
+	Forum   string    `json:"forum"`
+	Id      int       `json:"id"`
+	Message string    `json:"message"`
+	Slug    string    `json:"string"`
+	Title   string    `json:"title"`
+	Votes   int       `json:"votes"`
 }
