@@ -38,3 +38,7 @@ type Post struct {
 	Parent   int       `json:"parent"`
 	Thread   int       `json:"thread"`
 }
+
+type Message struct {
+	Message string `json:"message"`
+}

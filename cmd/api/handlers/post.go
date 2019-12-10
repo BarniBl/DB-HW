@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"github.com/BarniBl/DB-HW/internal/forum"
+	"github.com/BarniBl/DB-HW/internal/input"
 	"github.com/BarniBl/DB-HW/internal/output"
 	"github.com/labstack/echo"
 	"net/http"
@@ -75,4 +76,44 @@ func (h *Post) GetFullPost(ctx echo.Context) error {
 	fullPost.Thread = threadSlice[0]
 
 	return ctx.JSON(http.StatusOK, fullPost)
+}
+
+func (h *Post) EditMessage(ctx echo.Context) error {
+	idStr := ctx.Param("id")
+	if idStr == "" {
+		return ctx.JSON(http.StatusBadRequest, output.ErrorMessage{Message: "Error"})
+	}
+
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+	}
+	if id < 0 {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+	}
+	editMessage := input.Message{}
+	if err := ctx.Bind(&editMessage); err != nil {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusBadRequest, output.ErrorMessage{Message: "Error"})
+	}
+
+	num, err := h.PostService.UpdatePostMessage(editMessage.Message, id)
+	if err != nil {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+	}
+
+	if num != 1 {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusBadRequest, output.ErrorMessage{Message: "Error"})
+	}
+
+	post, err := h.PostService.SelectPostById(id)
+	if err != nil {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+	}
+	return ctx.JSON(http.StatusNotFound, post[0])
 }

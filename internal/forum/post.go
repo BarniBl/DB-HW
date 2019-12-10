@@ -39,3 +39,14 @@ func (ps *PostService) SelectPostById(id int) (postSl []input.Post, er error) {
 	}
 	return postSlice, nil
 }
+
+func (ps *PostService) UpdatePostMessage(newMessage string, id int) (int, error) {
+	sqlQuery := `UPDATE public.post SET message = $1
+	where post.id = $2`
+	result, err := ps.db.Exec(sqlQuery, )
+	if err != nil {
+		return 0, err
+	}
+	num, _ := result.RowsAffected()
+	return int(num), nil
+}

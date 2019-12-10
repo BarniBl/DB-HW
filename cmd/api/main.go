@@ -50,6 +50,7 @@ func main() {
 	e.GET("/forum/:slug/users", forum.GetForumUsers)
 
 	e.GET("/post/:id/details", post.GetFullPost)
+	e.POST("/post/:id/details", post.EditMessage)
 
 	e.Use(middleware.Logger())
 	e.Logger.Warnf("start listening on %s", host)
