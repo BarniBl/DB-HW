@@ -36,6 +36,7 @@ func main() {
 
 	user := handlers.User{UserService: userService}
 	forum := handlers.Forum{ForumService: forumService, UserService: userService, ThreadService: threadService}
+	post := handlers.Post{PostService: postService, ForumService: forumService, UserService: userService, ThreadService: threadService}
 
 	e := echo.New()
 	e.POST("/user/:nickname/create", user.CreateUser)
@@ -47,6 +48,8 @@ func main() {
 	e.GET("/forum/:slug/details", forum.GetForumDetails)
 	e.GET("/forum/:slug/threads", forum.GetForumThreads)
 	e.GET("/forum/:slug/users", forum.GetForumUsers)
+
+	e.GET("/post/:id/details", post.GetFullPost)
 
 	e.Use(middleware.Logger())
 	e.Logger.Warnf("start listening on %s", host)

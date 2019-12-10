@@ -224,7 +224,7 @@ func (h *Forum) GetForumUsers(ctx echo.Context) error {
 		}
 		return ctx.JSON(http.StatusOK, users)
 	}
-	users, err := h.ThreadService.SelectUsersByForum(slug, limit, since)
+	users, err := h.UserService.SelectUsersByForum(slug, limit, since)
 	if err != nil {
 		ctx.Logger().Warn(err)
 		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
