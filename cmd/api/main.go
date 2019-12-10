@@ -43,6 +43,7 @@ func main() {
 	e.POST("/forum/create", forum.CreateForum)
 	e.POST("/forum/:slug/create", forum.CreateThread)
 	e.GET("/forum/:slug/details", forum.GetForumDetails)
+	e.GET("/forum/:slug/threads", forum.GetForumThreads)
 
 	e.Use(middleware.Logger())
 	e.Logger.Warnf("start listening on %s", host)

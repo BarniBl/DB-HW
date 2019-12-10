@@ -7,6 +7,7 @@ import (
 	"github.com/BarniBl/DB-HW/internal/output"
 	"github.com/labstack/echo"
 	"net/http"
+	"strconv"
 )
 
 type Forum struct {
@@ -115,4 +116,61 @@ func (h *Forum) GetForumDetails(ctx echo.Context) error {
 	}
 
 	return ctx.JSON(http.StatusOK, forumSlice[0])
+}
+
+func (h *Forum) GetForumThreads(ctx echo.Context) error {
+	slug := ctx.Param("slug")
+	if slug == "" {
+		return ctx.JSON(http.StatusBadRequest, output.ErrorMessage{Message: "Error"})
+	}
+
+	limitStr := ctx.QueryParam("limit")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+	}
+	if limit < 0 {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+	}
+
+	sinceStr := ctx.QueryParam("since")
+	since, err := strconv.Atoi(sinceStr)
+	if err != nil {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+	}
+	if since < 0 {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+	}
+
+	descStr := ctx.QueryParam("desc")
+	desc, err := strconv.ParseBool(descStr)
+	if err != nil {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+	}
+
+	if desc == true {
+		threads, err := h.ThreadService.SelectThreadByForumDesc(slug, limit, since)
+		if err != nil {
+			ctx.Logger().Warn(err)
+			return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+		}
+		if len(threads) == 0 {
+			ctx.Logger().Warn(err)
+			return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+		}
+	}
+	threads, err := h.ThreadService.SelectThreadByForum(slug, limit, since)
+	if err != nil {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+	}
+	if len(threads) == 0 {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+	}
 }
