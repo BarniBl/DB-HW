@@ -68,6 +68,66 @@ func (us *UserService) SelectUserByNickName(nickName string) (userSl []input.Use
 	return userSlice, nil
 }
 
+func (us *UserService) SelectUsersByForumDesc(forum string, limit, since int) (userSl []input.User, er error) {
+	sqlQuery := `SELECT u.nick_name, u.email, u.full_name, u.about
+	FROM public.user as u 
+	JOIN thread as t ON t.author = u.nick_name AND t.forum = $1
+	JOIN post as p ON p.author = u.nick_name AND p.forum = $1
+	ORDER BY LOWER(u.nick_name) DESC
+	LIMIT $2 OFFSET $3`
+	userSlice := make([]input.User, 0)
+	rows, err := us.db.Query(sqlQuery, forum, limit, since)
+	if err != nil {
+		return userSlice, err
+	}
+
+	defer func() {
+		if err := rows.Close(); err != nil {
+			er = err
+		}
+	}()
+
+	for rows.Next() {
+		user := input.User{}
+		err := rows.Scan(&user.NickName, &user.Email, &user.FullName, &user.About)
+		if err != nil {
+			return userSlice, err
+		}
+		userSlice = append(userSlice, user)
+	}
+	return userSlice, nil
+}
+
+func (us *UserService) SelectUsersByForum(forum string, limit, since int) (userSl []input.User, er error) {
+	sqlQuery := `SELECT u.nick_name, u.email, u.full_name, u.about
+	FROM public.user as u 
+	JOIN thread as t ON t.author = u.nick_name AND t.forum = $1
+	JOIN post as p ON p.author = u.nick_name AND p.forum = $1
+	ORDER BY LOWER(u.nick_name)
+	LIMIT $2 OFFSET $3`
+	userSlice := make([]input.User, 0)
+	rows, err := us.db.Query(sqlQuery, forum, limit, since)
+	if err != nil {
+		return userSlice, err
+	}
+
+	defer func() {
+		if err := rows.Close(); err != nil {
+			er = err
+		}
+	}()
+
+	for rows.Next() {
+		user := input.User{}
+		err := rows.Scan(&user.NickName, &user.Email, &user.FullName, &user.About)
+		if err != nil {
+			return userSlice, err
+		}
+		userSlice = append(userSlice, user)
+	}
+	return userSlice, nil
+}
+
 func (us *UserService) InsertUser(user input.User) error {
 	sqlQuery := `INSERT INTO public.user (nick_name,email,full_name,about)
 	VALUES ($1,$2,$3,$4)`

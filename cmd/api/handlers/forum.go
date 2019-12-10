@@ -163,6 +163,7 @@ func (h *Forum) GetForumThreads(ctx echo.Context) error {
 			ctx.Logger().Warn(err)
 			return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
 		}
+		return ctx.JSON(http.StatusOK, threads)
 	}
 	threads, err := h.ThreadService.SelectThreadByForum(slug, limit, since)
 	if err != nil {
@@ -173,4 +174,64 @@ func (h *Forum) GetForumThreads(ctx echo.Context) error {
 		ctx.Logger().Warn(err)
 		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
 	}
+	return ctx.JSON(http.StatusOK, threads)
+}
+
+func (h *Forum) GetForumUsers(ctx echo.Context) error {
+	slug := ctx.Param("slug")
+	if slug == "" {
+		return ctx.JSON(http.StatusBadRequest, output.ErrorMessage{Message: "Error"})
+	}
+
+	limitStr := ctx.QueryParam("limit")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+	}
+	if limit < 0 {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+	}
+
+	sinceStr := ctx.QueryParam("since")
+	since, err := strconv.Atoi(sinceStr)
+	if err != nil {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+	}
+	if since < 0 {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+	}
+
+	descStr := ctx.QueryParam("desc")
+	desc, err := strconv.ParseBool(descStr)
+	if err != nil {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+	}
+
+	if desc == true {
+		users, err := h.UserService.SelectUsersByForumDesc(slug, limit, since)
+		if err != nil {
+			ctx.Logger().Warn(err)
+			return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+		}
+		if len(users) == 0 {
+			ctx.Logger().Warn(err)
+			return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+		}
+		return ctx.JSON(http.StatusOK, users)
+	}
+	users, err := h.ThreadService.SelectUsersByForum(slug, limit, since)
+	if err != nil {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+	}
+	if len(users) == 0 {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+	}
+	return ctx.JSON(http.StatusOK, users)
 }

@@ -31,9 +31,11 @@ func main() {
 
 	userService := forum.NewUserService(db)
 	threadService := forum.NewThreadService(db)
+	forumService := forum.NewForumService(db)
+	postService := forum.NewPostService(db)
 
 	user := handlers.User{UserService: userService}
-	forum := handlers.Forum{ForumService: forum.NewForumService(db), UserService: userService, ThreadService: threadService}
+	forum := handlers.Forum{ForumService: forumService, UserService: userService, ThreadService: threadService}
 
 	e := echo.New()
 	e.POST("/user/:nickname/create", user.CreateUser)
@@ -44,6 +46,7 @@ func main() {
 	e.POST("/forum/:slug/create", forum.CreateThread)
 	e.GET("/forum/:slug/details", forum.GetForumDetails)
 	e.GET("/forum/:slug/threads", forum.GetForumThreads)
+	e.GET("/forum/:slug/users", forum.GetForumUsers)
 
 	e.Use(middleware.Logger())
 	e.Logger.Warnf("start listening on %s", host)
