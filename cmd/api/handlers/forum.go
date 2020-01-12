@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/BarniBl/DB-HW/internal/forum"
 	"github.com/BarniBl/DB-HW/internal/input"
@@ -24,17 +25,20 @@ func (h *Forum) CreateForum(ctx echo.Context) (Err error) {
 		return ctx.JSON(http.StatusBadRequest, output.ErrorMessage{Message: "Error"})
 	}
 
-	forumSlice, err := h.ForumService.SelectForumBySlug(newForum.Slug)
-	if err != nil {
+	forum, err := h.ForumService.SelectFullForumBySlug(newForum.Slug)
+	if err == nil {
+		return ctx.JSON(http.StatusConflict, forum)
+	}
+	if err != sql.ErrNoRows {
 		ctx.Logger().Warn(err)
 		return ctx.JSON(http.StatusBadRequest, output.ErrorMessage{Message: "Error"})
 	}
 
-	if len(forumSlice) > 0 {
-		return ctx.JSON(http.StatusConflict, forumSlice)
-	}
-
-	if err := h.UserService.CheckUser(newForum.User); err != nil {
+	_, err = h.UserService.FindUserByNickName(newForum.User)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Can't find user"})
+		}
 		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
 	}
 
@@ -61,28 +65,29 @@ func (h *Forum) CreateThread(ctx echo.Context) (Err error) {
 
 	newThread.Forum = slug
 
-	forumSlice, err := h.ForumService.SelectForumBySlug(newThread.Forum)
+	_, err := h.ForumService.SelectForumBySlug(newThread.Forum)
 	if err != nil {
-		ctx.Logger().Warn(err)
-		return ctx.JSON(http.StatusBadRequest, output.ErrorMessage{Message: "Error"})
-	}
-
-	if len(forumSlice) != 1 {
-		return ctx.JSON(http.StatusNotFound, forumSlice)
-	}
-
-	if err := h.UserService.CheckUser(newThread.Author); err != nil {
+		if err == sql.ErrNoRows {
+			return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Can't find forum"})
+		}
 		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
 	}
 
-	threadCopySlice, err := h.ThreadService.SelectThreadByTitle(newThread.Title)
+	_, err = h.UserService.FindUserByNickName(newThread.Author)
 	if err != nil {
-		ctx.Logger().Warn(err)
-		return ctx.JSON(http.StatusBadRequest, output.ErrorMessage{Message: "Error"})
+		if err == sql.ErrNoRows {
+			return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Can't find user"})
+		}
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
 	}
 
-	if len(threadCopySlice) > 0 {
-		return ctx.JSON(http.StatusConflict, threadCopySlice)
+	thread, err := h.ThreadService.SelectThreadByTitle(newThread.Title)
+	if err == nil {
+		return ctx.JSON(http.StatusConflict, thread)
+	}
+	if err != sql.ErrNoRows {
+		ctx.Logger().Warn(err)
+		return ctx.JSON(http.StatusBadRequest, output.ErrorMessage{Message: "Error"})
 	}
 
 	err = h.ThreadService.InsertThread(newThread)
@@ -91,12 +96,12 @@ func (h *Forum) CreateThread(ctx echo.Context) (Err error) {
 		return ctx.JSON(http.StatusBadRequest, output.ErrorMessage{Message: "Error"})
 	}
 
-	threadSlice, err := h.ThreadService.SelectThreadByTitle(newThread.Title)
-	if len(threadSlice) != 1 {
-		return ctx.JSON(http.StatusConflict, output.ErrorMessage{Message: "Error"})
+	thread, err = h.ThreadService.SelectThreadByTitle(newThread.Title)
+	if err != nil {
+		return ctx.JSON(http.StatusBadRequest, "")
 	}
 
-	return ctx.JSON(http.StatusCreated, threadSlice[0])
+	return ctx.JSON(http.StatusCreated, thread)
 }
 
 func (h *Forum) GetForumDetails(ctx echo.Context) error {
@@ -105,17 +110,15 @@ func (h *Forum) GetForumDetails(ctx echo.Context) error {
 		return ctx.JSON(http.StatusBadRequest, output.ErrorMessage{Message: "Error"})
 	}
 
-	forumSlice, err := h.ForumService.SelectForumBySlug(slug)
+	forum, err := h.ForumService.SelectFullForumBySlug(slug)
 	if err != nil {
-		ctx.Logger().Warn(err)
-		return ctx.JSON(http.StatusBadRequest, output.ErrorMessage{Message: "Error"})
-	}
-	if len(forumSlice) != 1 {
-		ctx.Logger().Warn(err)
+		if err == sql.ErrNoRows {
+			return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Can't find forum"})
+		}
 		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
 	}
 
-	return ctx.JSON(http.StatusOK, forumSlice[0])
+	return ctx.JSON(http.StatusOK, forum)
 }
 
 func (h *Forum) GetForumThreads(ctx echo.Context) error {
@@ -234,4 +237,26 @@ func (h *Forum) GetForumUsers(ctx echo.Context) error {
 		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
 	}
 	return ctx.JSON(http.StatusOK, users)
+}
+
+func (h *Forum) Clean(ctx echo.Context) (Err error) {
+	defer func() {
+		if bodyErr := ctx.Request().Body.Close(); bodyErr != nil {
+			Err = errors.Wrap(Err, bodyErr.Error())
+		}
+	}()
+
+	ctx.Response().Header().Set("Content-Type", "application/json")
+
+	err := h.ForumService.Clean()
+	if err != nil {
+		return err
+	}
+
+
+	if err := ctx.JSON(200, nil); err != nil {
+		return err
+	}
+
+	return nil
 }

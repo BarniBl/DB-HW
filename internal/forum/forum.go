@@ -13,39 +13,47 @@ func NewForumService(db *sql.DB) *ForumService {
 	return &ForumService{db: db}
 }
 
-func (fs *ForumService) SelectForumBySlug(slug string) (forumSl []input.Forum, er error) {
+func (fs *ForumService) SelectFullForumBySlug(slug string) (forum input.Forum, err error) {
 	sqlQuery := `SELECT f.slug, f.title, f.user
-	FROM public.forum as f 
+	FROM public.forum as f
 	where f.slug = $1`
-	forumSlice := make([]input.Forum, 0)
-	rows, err := fs.db.Query(sqlQuery, slug)
+	err = fs.db.QueryRow(sqlQuery, slug).Scan(&forum.Slug, &forum.Title, &forum.User)
 	if err != nil {
-		return forumSlice, err
+		return
 	}
-
-	defer func() {
-		if err := rows.Close(); err != nil {
-			er = err
-		}
-	}()
-
-	for rows.Next() {
-		forum := input.Forum{}
-		err := rows.Scan(&forum.Slug, &forum.Title, &forum.User)
-		if err != nil {
-			return forumSlice, err
-		}
-		forumSlice = append(forumSlice, forum)
+	sqlQuery = `SELECT count(*)
+	FROM public.thread as t
+	where t.forum = $1`
+	err = fs.db.QueryRow(sqlQuery, slug).Scan(&forum.Threads)
+	if err != nil {
+		return
 	}
-	return forumSlice, nil
+	sqlQuery = `
+	SELECT count(*)
+	FROM public.post as p
+	where p.forum = $1`
+	err = fs.db.QueryRow(sqlQuery, slug).Scan(&forum.Posts)
+	return
 }
 
-func (fs *ForumService) InsertForum(forum input.Forum) error {
+func (fs *ForumService) SelectForumBySlug(slug string) (forum input.Forum, err error) {
+	sqlQuery := `
+	SELECT f.slug, f.title, f.user
+	FROM public.forum as f
+	where f.slug = $1`
+	err = fs.db.QueryRow(sqlQuery, slug).Scan(&forum.Slug, &forum.Title, &forum.User)
+	return
+}
+
+func (fs *ForumService) InsertForum(forum input.Forum) (err error) {
 	sqlQuery := `INSERT INTO public.forum (slug, title, "user")
 	VALUES ($1,$2,$3)`
-	_, err := fs.db.Exec(sqlQuery, forum.Slug, forum.Title, forum.User)
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err = fs.db.Exec(sqlQuery, forum.Slug, forum.Title, forum.User)
+	return
+}
+
+func (fs *ForumService) Clean() (err error) {
+	sqlQuery := `TRUNCATE forum.vote, forum.post, forum.thread, forum.forum, forum.user RESTART IDENTITY CASCADE;`
+	_, err = fs.db.Exec(sqlQuery)
+	return
 }

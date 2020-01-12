@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"github.com/BarniBl/DB-HW/internal/forum"
 	"github.com/BarniBl/DB-HW/internal/input"
 	"github.com/BarniBl/DB-HW/internal/output"
@@ -47,17 +48,15 @@ func (h *User) GetProfile(ctx echo.Context) (Err error) {
 	if nickName == "" {
 		return ctx.JSON(http.StatusBadRequest, output.ErrorMessage{Message:"Error"})
 	}
-	userSlice, err := h.UserService.SelectUserByNickName(nickName)
+	user, err := h.UserService.SelectUserByNickName(nickName)
 	if err != nil {
-		ctx.Logger().Warn(err)
-		return ctx.JSON(http.StatusBadRequest, output.ErrorMessage{Message:"Error"})
+		if err == sql.ErrNoRows {
+			return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Can't find user"})
+		}
+		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
 	}
 
-	if len(userSlice) != 1 {
-		return ctx.JSON(http.StatusNotFound, userSlice)
-	}
-
-	return ctx.JSON(http.StatusOK, userSlice[0])
+	return ctx.JSON(http.StatusOK, user)
 }
 
 func (h *User) EditProfile(ctx echo.Context) (Err error) {

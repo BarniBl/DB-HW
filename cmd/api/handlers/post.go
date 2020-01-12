@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"github.com/BarniBl/DB-HW/internal/forum"
 	"github.com/BarniBl/DB-HW/internal/input"
 	"github.com/BarniBl/DB-HW/internal/output"
@@ -32,48 +33,39 @@ func (h *Post) GetFullPost(ctx echo.Context) error {
 		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
 	}
 
-	postSlice, err := h.PostService.SelectPostById(id)
+	post, err := h.PostService.SelectPostById(id)
 	if err != nil {
-		ctx.Logger().Warn(err)
+		if err == sql.ErrNoRows {
+			return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Can't find post"})
+		}
 		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
 	}
-	if len(postSlice) == 0 {
-		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
-	}
-
-	post := postSlice[0]
 
 	fullPost := output.FullPost{Post: post}
 
-	userSlice, err := h.UserService.SelectUserByNickName(post.Author)
+	user, err := h.UserService.SelectUserByNickName(post.Author)
 	if err != nil {
-		ctx.Logger().Warn(err)
+		if err == sql.ErrNoRows {
+			return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Can't find user"})
+		}
 		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
 	}
-	if len(userSlice) == 0 {
-		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
-	}
-	fullPost.Author = userSlice[0]
+	fullPost.Author = user
 
-	forumSlice, err := h.ForumService.SelectForumBySlug(post.Forum)
+	forum, err := h.ForumService.SelectFullForumBySlug(post.Forum)
 	if err != nil {
-		ctx.Logger().Warn(err)
+		if err == sql.ErrNoRows {
+			return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Can't find forum"})
+		}
 		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
 	}
-	if len(forumSlice) == 0 {
-		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
-	}
-	fullPost.Forum = forumSlice[0]
+	fullPost.Forum = forum
 
-	threadSlice, err := h.ThreadService.SelectThreadById(post.Thread)
+	thread, err := h.ThreadService.SelectThreadById(post.Thread)
 	if err != nil {
-		ctx.Logger().Warn(err)
-		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
+		return ctx.JSON(http.StatusBadRequest, "")
 	}
-	if len(forumSlice) == 0 {
-		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
-	}
-	fullPost.Thread = threadSlice[0]
+	fullPost.Thread = thread
 
 	return ctx.JSON(http.StatusOK, fullPost)
 }
@@ -115,5 +107,5 @@ func (h *Post) EditMessage(ctx echo.Context) error {
 		ctx.Logger().Warn(err)
 		return ctx.JSON(http.StatusNotFound, output.ErrorMessage{Message: "Error"})
 	}
-	return ctx.JSON(http.StatusNotFound, post[0])
+	return ctx.JSON(http.StatusNotFound, post)
 }
