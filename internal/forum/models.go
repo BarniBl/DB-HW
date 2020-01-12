@@ -1,4 +1,4 @@
-package input
+package forum
 
 import "time"
 
@@ -41,4 +41,23 @@ type Post struct {
 
 type Message struct {
 	Message string `json:"message"`
+}
+
+
+type ErrorMessage struct {
+	Message string `json:"message"`
+}
+
+type FullPost struct {
+	Author User   `json:"author"`
+	Forum  Forum  `json:"forum"`
+	Post   Post   `json:"post"`
+	Thread Thread `json:"thread"`
+}
+
+type Status struct {
+	Post int `json:"post"`
+	Thread int `json:"thread"`
+	User	int `json:"user"`
+	Forum int `json:"forum"`
 }

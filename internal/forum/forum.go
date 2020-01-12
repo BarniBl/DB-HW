@@ -13,7 +13,7 @@ func NewForumService(db *sql.DB) *ForumService {
 	return &ForumService{db: db}
 }
 
-func (fs *ForumService) SelectFullForumBySlug(slug string) (forum input.Forum, err error) {
+func (fs *ForumService) SelectFullForumBySlug(slug string) (forum Forum, err error) {
 	sqlQuery := `SELECT f.slug, f.title, f.user
 	FROM public.forum as f
 	where f.slug = $1`
@@ -36,7 +36,7 @@ func (fs *ForumService) SelectFullForumBySlug(slug string) (forum input.Forum, e
 	return
 }
 
-func (fs *ForumService) SelectForumBySlug(slug string) (forum input.Forum, err error) {
+func (fs *ForumService) SelectForumBySlug(slug string) (forum Forum, err error) {
 	sqlQuery := `
 	SELECT f.slug, f.title, f.user
 	FROM public.forum as f
@@ -45,7 +45,7 @@ func (fs *ForumService) SelectForumBySlug(slug string) (forum input.Forum, err e
 	return
 }
 
-func (fs *ForumService) InsertForum(forum input.Forum) (err error) {
+func (fs *ForumService) InsertForum(forum Forum) (err error) {
 	sqlQuery := `INSERT INTO public.forum (slug, title, "user")
 	VALUES ($1,$2,$3)`
 	_, err = fs.db.Exec(sqlQuery, forum.Slug, forum.Title, forum.User)
@@ -55,5 +55,16 @@ func (fs *ForumService) InsertForum(forum input.Forum) (err error) {
 func (fs *ForumService) Clean() (err error) {
 	sqlQuery := `TRUNCATE forum.vote, forum.post, forum.thread, forum.forum, forum.user RESTART IDENTITY CASCADE;`
 	_, err = fs.db.Exec(sqlQuery)
+	return
+}
+
+func (fs *ForumService) SelectStatus() (status Status, err error) {
+	sqlQuery := `
+	SELECT
+	(SELECT COALESCE(SUM(forum.posts), 0) FROM forum.forum WHERE posts > 0) AS post, 
+	(SELECT COALESCE(SUM(forum.threads), 0) FROM forum.forum WHERE threads > 0) AS thread, 
+	(SELECT COUNT(*) FROM forum.user) AS user,
+	(SELECT COUNT(*) FROM forum.forum) AS forum;`
+	err = fs.db.QueryRow(sqlQuery).Scan(&status.Post, &status.Thread, &status.User, &status.Forum)
 	return
 }

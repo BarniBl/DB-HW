@@ -52,7 +52,8 @@ func main() {
 	e.GET("/post/:id/details", post.GetFullPost)
 	e.POST("/post/:id/details", post.EditMessage)
 
-	e.POST("/service/clear", forum.DBClean)
+	e.POST("/service/clear", forum.Clean)
+	e.GET("/service/status", forum.Status)
 
 	e.Use(middleware.Logger())
 	e.Logger.Warnf("start listening on %s", host)
