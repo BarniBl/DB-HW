@@ -12,7 +12,7 @@ import (
 
 var (
 	connectionString = "postgres://postgres:7396@localhost:5432/forum?sslmode=disable"
-	host             = "0.0.0.0:8080"
+	host             = "0.0.0.0:5000"
 )
 
 func main() {
@@ -51,6 +51,9 @@ func main() {
 
 	e.GET("/post/:id/details", post.GetFullPost)
 	e.POST("/post/:id/details", post.EditMessage)
+
+	e.GET("/thread/:slug_or_id/details", post.GetFullPost)
+	e.POST("/thread/:slug_or_id/create", post.CreatePosts)
 
 	e.POST("/service/clear", forum.Clean)
 	e.GET("/service/status", forum.Status)

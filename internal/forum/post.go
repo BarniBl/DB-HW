@@ -2,7 +2,6 @@ package forum
 
 import (
 	"database/sql"
-	"github.com/BarniBl/DB-HW/internal/input"
 )
 
 type PostService struct {
@@ -13,7 +12,7 @@ func NewPostService(db *sql.DB) *PostService {
 	return &PostService{db: db}
 }
 
-func (ps *PostService) SelectPostById(id int) (post input.Post, err error) {
+func (ps *PostService) SelectPostById(id int) (post Post, err error) {
 	sqlQuery := `SELECT p.author, p.created, p.forum, p.id, p.is_edited, p.message, p.parent, p.thread
 	FROM public.post as p
 	where p.id = $1`
@@ -21,8 +20,17 @@ func (ps *PostService) SelectPostById(id int) (post input.Post, err error) {
 	return
 }
 
+func (ps *PostService) InsertPost(post Post) (lastId int, err error) {
+	sqlQuery := `INSERT INTO public.post (author, created, forum, message, parent, thread)
+	VALUES ($1,$2,$3,$4,$5,$6)
+	RETURNING id`
+	err = ps.db.QueryRow(sqlQuery, post.Author, post.Created, post.Forum, post.Message, post.Parent, post.Thread).Scan(&lastId)
+	return
+}
+
 func (ps *PostService) UpdatePostMessage(newMessage string, id int) (countUpdateString int64, err error) {
-	sqlQuery := `UPDATE public.post SET message = $1
+	sqlQuery := `UPDATE public.post SET message = $1,
+                       is_edited = true
 	where post.id = $2`
 	result, err := ps.db.Exec(sqlQuery, id)
 	if err != nil {
