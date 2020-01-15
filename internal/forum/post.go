@@ -20,6 +20,15 @@ func (ps *PostService) SelectPostById(id int) (post Post, err error) {
 	return
 }
 
+func (ps *PostService) FindPostById(id int, thread int) (err error) {
+	sqlQuery := `SELECT p.id
+	FROM public.post as p
+	where p.id = $1 AND p.thread = $2`
+	var postId int64
+	err = ps.db.QueryRow(sqlQuery, id, thread).Scan(&postId)
+	return
+}
+
 func (ps *PostService) InsertPost(post Post) (lastId int, err error) {
 	sqlQuery := `INSERT INTO public.post (author, created, forum, message, parent, thread)
 	VALUES ($1,$2,$3,$4,$5,$6)
@@ -32,7 +41,7 @@ func (ps *PostService) UpdatePostMessage(newMessage string, id int) (countUpdate
 	sqlQuery := `UPDATE public.post SET message = $1,
                        is_edited = true
 	where post.id = $2`
-	result, err := ps.db.Exec(sqlQuery, id)
+	result, err := ps.db.Exec(sqlQuery, newMessage, id)
 	if err != nil {
 		return
 	}

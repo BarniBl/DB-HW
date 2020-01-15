@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/BarniBl/DB-HW/internal/forum"
 	"github.com/labstack/echo"
+	"math"
 	"net/http"
 	"strconv"
 )
@@ -65,13 +66,14 @@ func (h *Forum) CreateThread(ctx echo.Context) (Err error) {
 
 	newThread.Forum = slug
 
-	_, err := h.ForumService.SelectForumBySlug(newThread.Forum)
+	threadForum, err := h.ForumService.SelectForumBySlug(newThread.Forum)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find forum"})
 		}
 		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
 	}
+	newThread.Forum = threadForum.Slug
 
 	_, err = h.UserService.FindUserByNickName(newThread.Author)
 	if err != nil {
@@ -81,22 +83,24 @@ func (h *Forum) CreateThread(ctx echo.Context) (Err error) {
 		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
 	}
 
-	thread, err := h.ThreadService.SelectThreadByTitleAndForum(newThread.Title, newThread.Forum)
-	if err == nil {
-		return ctx.JSON(http.StatusConflict, thread)
-	}
-	if err != sql.ErrNoRows {
-		ctx.Logger().Warn(err)
-		return ctx.JSON(http.StatusBadRequest, forum.ErrorMessage{Message: "Error"})
+	if newThread.Slug != "" {
+		thread, err := h.ThreadService.SelectThreadBySlug(newThread.Slug)
+		if err == nil {
+			return ctx.JSON(http.StatusConflict, thread)
+		}
+		if err != sql.ErrNoRows {
+			ctx.Logger().Warn(err)
+			return ctx.JSON(http.StatusBadRequest, forum.ErrorMessage{Message: "Error"})
+		}
 	}
 
-	err = h.ThreadService.InsertThread(newThread)
+	id, err := h.ThreadService.InsertThread(newThread)
 	if err != nil {
 		ctx.Logger().Warn(err)
 		return ctx.JSON(http.StatusBadRequest, forum.ErrorMessage{Message: "Error"})
 	}
 
-	thread, err = h.ThreadService.SelectThreadByTitleAndForum(newThread.Title, newThread.Forum)
+	thread, err := h.ThreadService.SelectThreadById(id)
 	if err != nil {
 		return ctx.JSON(http.StatusBadRequest, "")
 	}
@@ -169,47 +173,45 @@ func (h *Forum) GetForumUsers(ctx echo.Context) error {
 	if slug == "" {
 		return ctx.JSON(http.StatusBadRequest, forum.ErrorMessage{Message: "Error"})
 	}
-
+	_, err := h.ForumService.SelectForumBySlug(slug)
+	if err != nil {
+		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find forum"})
+	}
 	limitStr := ctx.QueryParam("limit")
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil {
-		ctx.Logger().Warn(err)
-		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
+		limit = math.MaxInt32
 	}
 	if limit < 0 {
 		ctx.Logger().Warn(err)
 		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
 	}
 
-	sinceStr := ctx.QueryParam("since")
-	since, err := strconv.Atoi(sinceStr)
-	if err != nil {
-		ctx.Logger().Warn(err)
-		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
-	}
-	if since < 0 {
-		ctx.Logger().Warn(err)
-		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
-	}
+	since := ctx.QueryParam("since")
 
 	descStr := ctx.QueryParam("desc")
 	desc, err := strconv.ParseBool(descStr)
 	if err != nil {
-		ctx.Logger().Warn(err)
-		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
+		desc = false
 	}
 
 	if desc == true {
+		if since == "" {
+			since = "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+		}
 		users, err := h.UserService.SelectUsersByForumDesc(slug, limit, since)
 		if err != nil {
 			ctx.Logger().Warn(err)
 			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
 		}
 		if len(users) == 0 {
-			ctx.Logger().Warn(err)
-			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
+			useres := []forum.User{}
+			return ctx.JSON(http.StatusOK, useres)
 		}
 		return ctx.JSON(http.StatusOK, users)
+	}
+	if since == "" {
+		since = ""
 	}
 	users, err := h.UserService.SelectUsersByForum(slug, limit, since)
 	if err != nil {
@@ -217,8 +219,8 @@ func (h *Forum) GetForumUsers(ctx echo.Context) error {
 		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
 	}
 	if len(users) == 0 {
-		ctx.Logger().Warn(err)
-		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
+		useres := []forum.User{}
+		return ctx.JSON(http.StatusOK, useres)
 	}
 	return ctx.JSON(http.StatusOK, users)
 }

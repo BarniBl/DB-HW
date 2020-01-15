@@ -2,6 +2,7 @@ package forum
 
 import (
 	"database/sql"
+
 )
 
 type UserService struct {
@@ -46,13 +47,15 @@ func (us *UserService) SelectUserByNickName(nickName string) (user User, err err
 	return
 }
 
-func (us *UserService) SelectUsersByForumDesc(forum string, limit, since int) (users []User, err error) {
-	sqlQuery := `SELECT u.nick_name, u.email, u.full_name, u.about
-	FROM public.user as u 
-	JOIN thread as t ON t.author = u.nick_name AND t.forum = $1
-	JOIN post as p ON p.author = u.nick_name AND p.forum = $1
-	ORDER BY LOWER(u.nick_name) DESC
-	LIMIT $2 OFFSET $3`
+func (us *UserService) SelectUsersByForumDesc(forum string, limit int, since string) (users []User, err error) {
+	sqlQuery := `
+	SELECT distinct nick_name, email, full_name, about
+	FROM "user" as u
+			 LEFT JOIN post as p ON lower(p.author) = lower(nick_name)
+			 LEFT JOIN thread as t ON lower(t.author) = lower(nick_name)
+	WHERE lower(nick_name) < lower($3) AND (lower(p.forum) = lower($1) OR lower(t.forum) = lower($1))
+	ORDER BY nick_name DESC 
+	LIMIT $2`
 	rows, err := us.db.Query(sqlQuery, forum, limit, since)
 	if err != nil {
 		return
@@ -75,13 +78,15 @@ func (us *UserService) SelectUsersByForumDesc(forum string, limit, since int) (u
 	return users, nil
 }
 
-func (us *UserService) SelectUsersByForum(forum string, limit, since int) (users []User, err error) {
-	sqlQuery := `SELECT u.nick_name, u.email, u.full_name, u.about
-	FROM public.user as u 
-	JOIN thread as t ON t.author = u.nick_name AND t.forum = $1
-	JOIN post as p ON p.author = u.nick_name AND p.forum = $1
-	ORDER BY LOWER(u.nick_name)
-	LIMIT $2 OFFSET $3`
+func (us *UserService) SelectUsersByForum(forum string, limit int, since string) (users []User, err error) {
+	sqlQuery := `
+	SELECT distinct nick_name, email, full_name, about
+	FROM "user" as u
+			 LEFT JOIN post as p ON lower(p.author) = lower(nick_name)
+			 LEFT JOIN thread as t ON lower(t.author) = lower(nick_name)
+	WHERE lower(nick_name) > lower($3) AND (lower(p.forum) = lower($1) OR lower(t.forum) = lower($1))
+	ORDER BY nick_name ASC
+	LIMIT $2`
 	rows, err := us.db.Query(sqlQuery, forum, limit, since)
 	if err != nil {
 		return

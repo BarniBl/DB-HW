@@ -52,8 +52,11 @@ func main() {
 	e.GET("/post/:id/details", post.GetFullPost)
 	e.POST("/post/:id/details", post.EditMessage)
 
-	e.GET("/thread/:slug_or_id/details", post.GetFullPost)
+	e.GET("/thread/:slug_or_id/details", post.GetThread)
+	e.POST("/thread/:slug_or_id/details", post.EditThread)
+	e.GET("/thread/:slug_or_id/posts", post.GetPosts)
 	e.POST("/thread/:slug_or_id/create", post.CreatePosts)
+	e.POST("/thread/:slug_or_id/vote", post.CreateVote)
 
 	e.POST("/service/clear", forum.Clean)
 	e.GET("/service/status", forum.Status)
