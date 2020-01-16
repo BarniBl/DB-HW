@@ -211,7 +211,16 @@ func (h *Forum) GetForumUsers(ctx echo.Context) error {
 		return ctx.JSON(http.StatusOK, users)
 	}
 	if since == "" {
-		since = ""
+		users, err := h.UserService.SelectUsersByForumAntiSince(slug, limit)
+		if err != nil {
+			ctx.Logger().Warn(err)
+			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
+		}
+		if len(users) == 0 {
+			useres := []forum.User{}
+			return ctx.JSON(http.StatusOK, useres)
+		}
+		return ctx.JSON(http.StatusOK, users)
 	}
 	users, err := h.UserService.SelectUsersByForum(slug, limit, since)
 	if err != nil {

@@ -109,6 +109,37 @@ func (us *UserService) SelectUsersByForum(forum string, limit int, since string)
 	return users, nil
 }
 
+func (us *UserService) SelectUsersByForumAntiSince(forum string, limit int) (users []User, err error) {
+	sqlQuery := `
+	SELECT distinct nick_name, email, full_name, about
+	FROM "user" as u
+			 LEFT JOIN post as p ON lower(p.author) = lower(nick_name)
+			 LEFT JOIN thread as t ON lower(t.author) = lower(nick_name)
+	WHERE (lower(p.forum) = lower($1) OR lower(t.forum) = lower($1))
+	ORDER BY nick_name ASC
+	LIMIT $2`
+	rows, err := us.db.Query(sqlQuery, forum, limit)
+	if err != nil {
+		return
+	}
+
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			err = closeErr
+		}
+	}()
+
+	for rows.Next() {
+		user := User{}
+		err := rows.Scan(&user.NickName, &user.Email, &user.FullName, &user.About)
+		if err != nil {
+			return users, err
+		}
+		users = append(users, user)
+	}
+	return users, nil
+}
+
 func (us *UserService) InsertUser(user User) error {
 	sqlQuery := `INSERT INTO public.user (nick_name,email,full_name,about)
 	VALUES ($1,$2,$3,$4)`

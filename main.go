@@ -12,7 +12,8 @@ import (
 )
 
 var (
-	connectionString = "postgres://forum:7396@localhost:5432/forum?sslmode=disable"
+	//connectionString = "postgres://forum:7396@localhost:5432/forum?sslmode=disable"
+	connectionString = "postgres://postgres:7396@localhost:5432/forum?sslmode=disable"
 	host             = "0.0.0.0:5000"
 )
 
@@ -43,27 +44,28 @@ func main() {
 	post := handlers.Post{PostService: postService, ForumService: forumService, UserService: userService, ThreadService: threadService}
 
 	e := echo.New()
-	e.POST("/user/:nickname/create", user.CreateUser)
-	e.GET("/user/:nickname/profile", user.GetProfile)
-	e.POST("/user/:nickname/profile", user.EditProfile)
+	prefix := "/api"
+	e.POST(prefix+"/user/:nickname/create", user.CreateUser)
+	e.GET(prefix+"/user/:nickname/profile", user.GetProfile)
+	e.POST(prefix+"/user/:nickname/profile", user.EditProfile)
 
-	e.POST("/forum/create", forum.CreateForum)
-	e.POST("/forum/:slug/create", forum.CreateThread)
-	e.GET("/forum/:slug/details", forum.GetForumDetails)
-	e.GET("/forum/:slug/threads", forum.GetForumThreads)
-	e.GET("/forum/:slug/users", forum.GetForumUsers)
+	e.POST(prefix+"/forum/create", forum.CreateForum)
+	e.POST(prefix+"/forum/:slug/create", forum.CreateThread)
+	e.GET(prefix+"/forum/:slug/details", forum.GetForumDetails)
+	e.GET(prefix+"/forum/:slug/threads", forum.GetForumThreads)
+	e.GET(prefix+"/forum/:slug/users", forum.GetForumUsers)
 
-	e.GET("/post/:id/details", post.GetFullPost)
-	e.POST("/post/:id/details", post.EditMessage)
+	e.GET(prefix+"/post/:id/details", post.GetFullPost)
+	e.POST(prefix+"/post/:id/details", post.EditMessage)
 
-	e.GET("/thread/:slug_or_id/details", post.GetThread)
-	e.POST("/thread/:slug_or_id/details", post.EditThread)
-	e.GET("/thread/:slug_or_id/posts", post.GetPosts)
-	e.POST("/thread/:slug_or_id/create", post.CreatePosts)
-	e.POST("/thread/:slug_or_id/vote", post.CreateVote)
+	e.GET(prefix+"/thread/:slug_or_id/details", post.GetThread)
+	e.POST(prefix+"/thread/:slug_or_id/details", post.EditThread)
+	e.GET(prefix+"/thread/:slug_or_id/posts", post.GetPosts)
+	e.POST(prefix+"/thread/:slug_or_id/create", post.CreatePosts)
+	e.POST(prefix+"/thread/:slug_or_id/vote", post.CreateVote)
 
-	e.POST("/service/clear", forum.Clean)
-	e.GET("/service/status", forum.Status)
+	e.POST(prefix+"/service/clear", forum.Clean)
+	e.GET(prefix+"/service/status", forum.Status)
 
 	e.Use(middleware.Logger())
 	e.Logger.Warnf("start listening on %s", host)
