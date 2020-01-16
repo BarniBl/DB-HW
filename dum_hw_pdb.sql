@@ -25,9 +25,9 @@ SET default_with_oids = false;
 --
 
 CREATE TABLE public.forum (
-    title text NOT NULL,
-    "user" text NOT NULL,
-    slug text NOT NULL
+                              title text NOT NULL,
+                              "user" text NOT NULL,
+                              slug text NOT NULL
 );
 
 
@@ -38,14 +38,14 @@ ALTER TABLE public.forum OWNER TO postgres;
 --
 
 CREATE TABLE public.post (
-    id integer NOT NULL,
-    author text NOT NULL,
-    created timestamp with time zone NOT NULL,
-    forum text NOT NULL,
-    is_edited boolean DEFAULT false NOT NULL,
-    message text NOT NULL,
-    parent integer DEFAULT 0 NOT NULL,
-    thread integer NOT NULL
+                             id integer NOT NULL,
+                             author text NOT NULL,
+                             created text NOT NULL,
+                             forum text NOT NULL,
+                             is_edited boolean DEFAULT false NOT NULL,
+                             message text NOT NULL,
+                             parent integer DEFAULT 0 NOT NULL,
+                             thread integer NOT NULL
 );
 
 
@@ -78,14 +78,14 @@ ALTER SEQUENCE public.post_id_seq OWNED BY public.post.id;
 --
 
 CREATE TABLE public.thread (
-    id integer NOT NULL,
-    author text NOT NULL,
-    created timestamp with time zone DEFAULT now() NOT NULL,
-    forum text NOT NULL,
-    message text NOT NULL,
-    slug text,
-    title text NOT NULL,
-    votes integer
+                               id integer NOT NULL,
+                               author text NOT NULL,
+                               created timestamp with time zone DEFAULT now() NOT NULL,
+                               forum text NOT NULL,
+                               message text NOT NULL,
+                               slug text,
+                               title text NOT NULL,
+                               votes integer
 );
 
 
@@ -118,10 +118,10 @@ ALTER SEQUENCE public.thread_id_seq OWNED BY public.thread.id;
 --
 
 CREATE TABLE public."user" (
-    nick_name text NOT NULL,
-    full_name text NOT NULL,
-    email text NOT NULL,
-    about text
+                               nick_name text NOT NULL,
+                               full_name text NOT NULL,
+                               email text NOT NULL,
+                               about text
 );
 
 
@@ -132,9 +132,9 @@ ALTER TABLE public."user" OWNER TO postgres;
 --
 
 CREATE TABLE public.vote (
-    nick_name text NOT NULL,
-    voice integer NOT NULL,
-    thread_id integer NOT NULL
+                             nick_name text NOT NULL,
+                             voice integer NOT NULL,
+                             thread_id integer NOT NULL
 );
 
 
@@ -153,19 +153,18 @@ ALTER TABLE ONLY public.post ALTER COLUMN id SET DEFAULT nextval('public.post_id
 
 ALTER TABLE ONLY public.thread ALTER COLUMN id SET DEFAULT nextval('public.thread_id_seq'::regclass);
 
-
 --
 -- Name: post_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.post_id_seq', 1, false);
+SELECT pg_catalog.setval('public.post_id_seq', 11, true);
 
 
 --
 -- Name: thread_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.thread_id_seq', 1, false);
+SELECT pg_catalog.setval('public.thread_id_seq', 11, true);
 
 
 --
@@ -189,7 +188,7 @@ ALTER TABLE ONLY public.thread
 --
 
 ALTER TABLE ONLY public.vote
-    ADD CONSTRAINT vote_pk PRIMARY KEY (nick_name);
+    ADD CONSTRAINT vote_pk PRIMARY KEY (nick_name, thread_id);
 
 
 --
