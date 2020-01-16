@@ -334,14 +334,14 @@ func (ts *ThreadService) SelectPosts(threadID int, limit, since, sort, desc stri
 
 		for rows.Next() {
 			scanPost := Post{}
-			var timetz time.Time
-			err := rows.Scan(&scanPost.Author, &timetz, &scanPost.Forum,
+			//var timetz time.Time
+			err := rows.Scan(&scanPost.Author, &scanPost.Created, &scanPost.Forum,
 				&scanPost.Id, &scanPost.IsEdited, &scanPost.Message, &scanPost.Parent,
 				&scanPost.Thread)
 			if err != nil {
 				return posts, err
 			}
-			scanPost.Created = timetz.Format(time.RFC3339Nano)
+			//scanPost.Created = timetz.Format(time.RFC3339Nano)
 			posts = append(posts, scanPost)
 		}
 	} else {
@@ -355,8 +355,8 @@ func (ts *ThreadService) SelectPosts(threadID int, limit, since, sort, desc stri
 
 		for rows.Next() {
 			scanPost := Post{}
-			var timetz time.Time
-			err := rows.Scan(&scanPost.Author, &timetz, &scanPost.Forum,
+			//var timetz time.Time
+			err := rows.Scan(&scanPost.Author, &scanPost.Created, &scanPost.Forum,
 				&scanPost.Id, &scanPost.IsEdited, &scanPost.Message, &scanPost.Parent,
 				&scanPost.Thread)
 			if err != nil {
@@ -369,7 +369,7 @@ func (ts *ThreadService) SelectPosts(threadID int, limit, since, sort, desc stri
 			if count > limitDigit && (since == "0" || since == "999999999") {
 				break
 			} else {
-				scanPost.Created = timetz.Format(time.RFC3339Nano)
+				//scanPost.Created = timetz.Format(time.RFC3339Nano)
 				posts = append(posts, scanPost)
 			}
 
