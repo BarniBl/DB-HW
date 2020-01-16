@@ -7,7 +7,7 @@ COPY go.sum .
 RUN go mod download
 
 COPY . .
-RUN go build -v
+RUN go build -v -work
 
 FROM ubuntu:19.04
 ENV DEBIAN_FRONTEND=noninteractive
@@ -35,5 +35,6 @@ RUN service postgresql start &&\
 VOLUME  ["/etc/postgresql", "/var/log/postgresql", "/var/lib/postgresql"]
 
 COPY dum_hw_pdb.sql .
+RUN ls /usr
 COPY --from=builder /usr/src/app/DB-HW .
-CMD service postgresql start && ./DB_TP
+CMD service postgresql start && ./DB-HW

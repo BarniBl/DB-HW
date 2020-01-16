@@ -1,4 +1,4 @@
-package DB_HW
+package main
 
 import (
 	"database/sql"
@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	connectionString = "postgres://postgres:7396@localhost:5432/forum?sslmode=disable"
+	connectionString = "postgres://forum:7396@localhost:5432/forum?sslmode=disable"
 	host             = "0.0.0.0:5000"
 )
 
