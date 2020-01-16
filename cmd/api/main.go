@@ -8,6 +8,7 @@ import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	_ "github.com/lib/pq"
+	"io/ioutil"
 )
 
 var (
@@ -28,7 +29,10 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-
+	err = LoadSchemaSQL(db)
+	if err != nil {
+		fmt.Println(err)
+	}
 	userService := forum.NewUserService(db)
 	threadService := forum.NewThreadService(db)
 	forumService := forum.NewForumService(db)
@@ -69,4 +73,26 @@ func main() {
 
 	e.Logger.Warnf("shutdown")
 
+}
+
+const dbSchema = "dum_hw_pdb.sql"
+
+func LoadSchemaSQL(db *sql.DB) error {
+
+	content, err := ioutil.ReadFile(dbSchema)
+	if err != nil {
+		return err
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err = tx.Exec(string(content)); err != nil {
+		return err
+	}
+	tx.Commit()
+	return nil
 }
