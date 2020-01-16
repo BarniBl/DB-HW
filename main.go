@@ -1,4 +1,4 @@
-package main
+package DB_HW
 
 import (
 	"database/sql"

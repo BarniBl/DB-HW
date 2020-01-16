@@ -34,6 +34,6 @@ RUN service postgresql start &&\
 
 VOLUME  ["/etc/postgresql", "/var/log/postgresql", "/var/lib/postgresql"]
 
-COPY sunrise_db.sql .
-COPY --from=builder /usr/src/app/DB_TP .
+COPY dum_hw_pdb.sql .
+COPY --from=builder /usr/src/app/DB-HW .
 CMD service postgresql start && ./DB_TP
