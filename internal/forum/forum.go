@@ -59,10 +59,11 @@ func (fs *ForumService) Clean() (err error) {
 
 func (fs *ForumService) SelectStatus() (status Status, err error) {
 	sqlQuery := `
-	SELECT * FROM (SELECT COUNT(Post.id) AS post FROM Post) AS Post,
-							(SELECT COUNT(Thread.id) AS thread FROM Thread) AS Thread,
-							(SELECT COUNT(Forum.slug) AS forum FROM Forum) AS Forum,
-							(SELECT COUNT(*) AS "user" FROM "user") AS Users;`
+	SELECT *
+	FROM (SELECT COUNT(*) AS post FROM public.post) AS Post,
+		 (SELECT COUNT(*) AS thread FROM public.thread) AS Thread,
+		 (SELECT COUNT(*) AS forum FROM public.forum) AS Forum,
+		 (SELECT COUNT(*) AS "user" FROM public.user) AS Users;`
 	err = fs.db.QueryRow(sqlQuery).Scan(&status.Post, &status.Thread, &status.Forum, &status.User)
 	return
 }

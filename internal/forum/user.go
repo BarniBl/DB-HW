@@ -50,9 +50,9 @@ func (us *UserService) SelectUserByNickName(nickName string) (user User, err err
 func (us *UserService) SelectUsersByForumDesc(forum string, limit int, since string) (users []User, err error) {
 	sqlQuery := `
 	SELECT distinct nick_name, email, full_name, about
-	FROM "user" as u
-			 LEFT JOIN post as p ON lower(p.author) = lower(nick_name)
-			 LEFT JOIN thread as t ON lower(t.author) = lower(nick_name)
+	FROM public.user as u
+			 LEFT JOIN public.post as p ON lower(p.author) = lower(nick_name)
+			 LEFT JOIN public.thread as t ON lower(t.author) = lower(nick_name)
 	WHERE lower(nick_name) < lower($3) AND (lower(p.forum) = lower($1) OR lower(t.forum) = lower($1))
 	ORDER BY nick_name DESC 
 	LIMIT $2`
@@ -81,9 +81,9 @@ func (us *UserService) SelectUsersByForumDesc(forum string, limit int, since str
 func (us *UserService) SelectUsersByForum(forum string, limit int, since string) (users []User, err error) {
 	sqlQuery := `
 	SELECT distinct nick_name, email, full_name, about
-	FROM "user" as u
-			 LEFT JOIN post as p ON lower(p.author) = lower(nick_name)
-			 LEFT JOIN thread as t ON lower(t.author) = lower(nick_name)
+	FROM public.user as u
+			 LEFT JOIN public.post as p ON lower(p.author) = lower(nick_name)
+			 LEFT JOIN public.thread as t ON lower(t.author) = lower(nick_name)
 	WHERE lower(nick_name) > lower($3) AND (lower(p.forum) = lower($1) OR lower(t.forum) = lower($1))
 	ORDER BY nick_name ASC
 	LIMIT $2`
@@ -112,9 +112,9 @@ func (us *UserService) SelectUsersByForum(forum string, limit int, since string)
 func (us *UserService) SelectUsersByForumAntiSince(forum string, limit int) (users []User, err error) {
 	sqlQuery := `
 	SELECT distinct nick_name, email, full_name, about
-	FROM "user" as u
-			 LEFT JOIN post as p ON lower(p.author) = lower(nick_name)
-			 LEFT JOIN thread as t ON lower(t.author) = lower(nick_name)
+	FROM public.user as u
+			 LEFT JOIN public.post as p ON lower(p.author) = lower(nick_name)
+			 LEFT JOIN public.thread as t ON lower(t.author) = lower(nick_name)
 	WHERE (lower(p.forum) = lower($1) OR lower(t.forum) = lower($1))
 	ORDER BY nick_name ASC
 	LIMIT $2`
