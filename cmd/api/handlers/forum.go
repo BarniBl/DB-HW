@@ -194,43 +194,47 @@ func (h *Forum) GetForumUsers(ctx echo.Context) error {
 	if err != nil {
 		desc = false
 	}
-
-	if desc == true {
-		if since == "" {
-			since = "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
-		}
-		users, err := h.UserService.SelectUsersByForumDesc(slug, limit, since)
-		if err != nil {
-			ctx.Logger().Warn(err)
-			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
-		}
-		if len(users) == 0 {
-			useres := []forum.User{}
-			return ctx.JSON(http.StatusOK, useres)
-		}
-		return ctx.JSON(http.StatusOK, users)
-	}
-	if since == "" {
-		users, err := h.UserService.SelectUsersByForumAntiSince(slug, limit)
-		if err != nil {
-			ctx.Logger().Warn(err)
-			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
-		}
-		if len(users) == 0 {
-			useres := []forum.User{}
-			return ctx.JSON(http.StatusOK, useres)
-		}
-		return ctx.JSON(http.StatusOK, users)
-	}
-	users, err := h.UserService.SelectUsersByForum(slug, limit, since)
+/*	users, err := h.UserService.SelectAllUsersByForum(slug, limitStr, since, descStr)
 	if err != nil {
 		ctx.Logger().Warn(err)
 		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
-	}
-	if len(users) == 0 {
-		useres := []forum.User{}
-		return ctx.JSON(http.StatusOK, useres)
-	}
+	}*/
+		if desc == true {
+			if since == "" {
+				since = "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+			}
+			users, err := h.UserService.SelectUsersByForumDesc(slug, limit, since)
+			if err != nil {
+				ctx.Logger().Warn(err)
+				return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
+			}
+			if len(users) == 0 {
+				useres := []forum.User{}
+				return ctx.JSON(http.StatusOK, useres)
+			}
+			return ctx.JSON(http.StatusOK, users)
+		}
+		if since == "" {
+			users, err := h.UserService.SelectUsersByForumAntiSince(slug, limit)
+			if err != nil {
+				ctx.Logger().Warn(err)
+				return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
+			}
+			if len(users) == 0 {
+				useres := []forum.User{}
+				return ctx.JSON(http.StatusOK, useres)
+			}
+			return ctx.JSON(http.StatusOK, users)
+		}
+		users, err := h.UserService.SelectUsersByForum(slug, limit, since)
+		if err != nil {
+			ctx.Logger().Warn(err)
+			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
+		}
+		if len(users) == 0 {
+			useres := []forum.User{}
+			return ctx.JSON(http.StatusOK, useres)
+		}
 	return ctx.JSON(http.StatusOK, users)
 }
 

@@ -67,3 +67,5 @@ func (fs *ForumService) SelectStatus() (status Status, err error) {
 	err = fs.db.QueryRow(sqlQuery).Scan(&status.Post, &status.Thread, &status.Forum, &status.User)
 	return
 }
+
+
