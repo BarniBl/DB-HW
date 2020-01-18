@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"database/sql"
 	"github.com/BarniBl/DB-HW/internal/forum"
+	"github.com/jackc/pgx"
 	"github.com/labstack/echo"
 	"net/http"
 )
@@ -48,7 +48,7 @@ func (h *User) GetProfile(ctx echo.Context) (Err error) {
 	}
 	user, err := h.UserService.SelectUserByNickName(nickName)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find user"})
 		}
 		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})

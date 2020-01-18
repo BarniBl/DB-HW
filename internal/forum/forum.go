@@ -1,14 +1,14 @@
 package forum
 
 import (
-	"database/sql"
+	"github.com/jackc/pgx"
 )
 
 type ForumService struct {
-	db *sql.DB
+	db *pgx.ConnPool
 }
 
-func NewForumService(db *sql.DB) *ForumService {
+func NewForumService(db *pgx.ConnPool) *ForumService {
 	return &ForumService{db: db}
 }
 

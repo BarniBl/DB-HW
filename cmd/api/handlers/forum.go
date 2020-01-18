@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"database/sql"
 	"fmt"
 	"github.com/BarniBl/DB-HW/internal/forum"
+	"github.com/jackc/pgx"
 	"github.com/labstack/echo"
 	"math"
 	"net/http"
@@ -28,14 +28,14 @@ func (h *Forum) CreateForum(ctx echo.Context) (Err error) {
 	if err == nil {
 		return ctx.JSON(http.StatusConflict, fullForum)
 	}
-	if err != sql.ErrNoRows {
+	if err != pgx.ErrNoRows {
 		ctx.Logger().Warn(err)
 		return ctx.JSON(http.StatusBadRequest, forum.ErrorMessage{Message: "Error"})
 	}
 
 	nickName, err := h.UserService.FindUserByNickName(newForum.User)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find user"})
 		}
 		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
@@ -68,7 +68,7 @@ func (h *Forum) CreateThread(ctx echo.Context) (Err error) {
 
 	threadForum, err := h.ForumService.SelectForumBySlug(newThread.Forum)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find forum"})
 		}
 		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
@@ -77,7 +77,7 @@ func (h *Forum) CreateThread(ctx echo.Context) (Err error) {
 
 	_, err = h.UserService.FindUserByNickName(newThread.Author)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find user"})
 		}
 		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
@@ -88,7 +88,7 @@ func (h *Forum) CreateThread(ctx echo.Context) (Err error) {
 		if err == nil {
 			return ctx.JSON(http.StatusConflict, thread)
 		}
-		if err != sql.ErrNoRows {
+		if err != pgx.ErrNoRows {
 			ctx.Logger().Warn(err)
 			return ctx.JSON(http.StatusBadRequest, forum.ErrorMessage{Message: "Error"})
 		}
@@ -116,7 +116,7 @@ func (h *Forum) GetForumDetails(ctx echo.Context) error {
 
 	fullForum, err := h.ForumService.SelectFullForumBySlug(slug)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find forum"})
 		}
 		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
@@ -151,7 +151,7 @@ func (h *Forum) GetForumThreads(ctx echo.Context) error {
 	}
 	_, err = h.ForumService.SelectForumBySlug(slug)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
 		}
 		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})

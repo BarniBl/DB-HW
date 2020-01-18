@@ -2,17 +2,17 @@ package forum
 
 import (
 	"bytes"
-	"database/sql"
+	"github.com/jackc/pgx"
 	xsort "sort"
 	"strconv"
 	"strings"
 )
 
 type UserService struct {
-	db *sql.DB
+	db *pgx.ConnPool
 }
 
-func NewUserService(db *sql.DB) *UserService {
+func NewUserService(db *pgx.ConnPool) *UserService {
 	return &UserService{db: db}
 }
 
@@ -25,11 +25,7 @@ func (us *UserService) SelectUserByNickNameOrEmail(nickName, email string) (user
 		return users, err
 	}
 
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil {
-			err = closeErr
-		}
-	}()
+	defer rows.Close()
 
 	for rows.Next() {
 		userScan := User{}
@@ -64,11 +60,7 @@ func (us *UserService) SelectUsersByForumDesc(forum string, limit int, since str
 		return
 	}
 
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil {
-			err = closeErr
-		}
-	}()
+	defer rows.Close()
 
 	for rows.Next() {
 		user := User{}
@@ -96,11 +88,7 @@ func (us *UserService) SelectUsersByForum(forum string, limit int, since string)
 		return
 	}
 
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil {
-			err = closeErr
-		}
-	}()
+	defer rows.Close()
 
 	for rows.Next() {
 		user := User{}
@@ -128,11 +116,7 @@ func (us *UserService) SelectUsersByForumAntiSince(forum string, limit int) (use
 		return
 	}
 
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil {
-			err = closeErr
-		}
-	}()
+	defer rows.Close()
 
 	for rows.Next() {
 		user := User{}
@@ -178,7 +162,7 @@ func (us *UserService) FindUserByNickName(nickName string) (findNickName string,
 }
 
 func (us *UserService) SelectAllUsersByForum(slug, limit, since, desc string) (users []User, err error) {
-	var rows *sql.Rows
+	var rows *pgx.Rows
 	//if since == "" {
 	if desc == "false" {
 		sqlQuery := "SELECT u.about, u.email, u.full_name, u.nick_name " +

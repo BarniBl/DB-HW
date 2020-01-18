@@ -1,24 +1,40 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"github.com/BarniBl/DB-HW/cmd/api/handlers"
 	"github.com/BarniBl/DB-HW/internal/forum"
+	"github.com/jackc/pgx"
+	_ "github.com/jackc/pgx"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
-	_ "github.com/lib/pq"
 	"io/ioutil"
 )
 
 var (
-	connectionString = "postgres://forum:7396@localhost:5432/forum?sslmode=disable"
-	//connectionString = "postgres://postgres:7396@localhost:5432/forum?sslmode=disable"
+	//connectionString = "postgres://forum:7396@localhost:5432/forum?sslmode=disable"
+	connectionString = "postgres://postgres:7396@localhost:5432/forum?sslmode=disable"
 	host             = "0.0.0.0:5000"
+	maxConn = 2000
 )
 
 func main() {
-	db, err := sql.Open("postgres", connectionString)
+	config, err := pgx.ParseURI(connectionString)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	db, err := pgx.NewConnPool(
+		pgx.ConnPoolConfig{
+			ConnConfig:     config,
+			MaxConnections: maxConn,
+		})
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+/*	db, err := sql.Open("postgres", connectionString)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -29,7 +45,7 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 		return
-	}
+	}*/
 	err = LoadSchemaSQL(db)
 	if err != nil {
 		fmt.Println(err)
@@ -79,7 +95,7 @@ func main() {
 
 const dbSchema = "dum_hw_pdb.sql"
 
-func LoadSchemaSQL(db *sql.DB) error {
+func LoadSchemaSQL(db *pgx.ConnPool) error {
 
 	content, err := ioutil.ReadFile(dbSchema)
 	if err != nil {

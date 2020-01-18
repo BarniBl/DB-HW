@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"database/sql"
 	"github.com/BarniBl/DB-HW/internal/forum"
+	"github.com/jackc/pgx"
 	"github.com/labstack/echo"
 	"net/http"
 	"strconv"
@@ -37,7 +37,7 @@ func (h *Post) GetFullPost(ctx echo.Context) error {
 
 	post, err := h.PostService.SelectPostById(id)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find post"})
 		}
 		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
@@ -48,7 +48,7 @@ func (h *Post) GetFullPost(ctx echo.Context) error {
 	if strings.Contains(related, "user") {
 		user, err := h.UserService.SelectUserByNickName(post.Author)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if err == pgx.ErrNoRows {
 				return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find user"})
 			}
 			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
@@ -59,7 +59,7 @@ func (h *Post) GetFullPost(ctx echo.Context) error {
 	if strings.Contains(related, "forum") {
 		fullForum, err := h.ForumService.SelectFullForumBySlug(post.Forum)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if err == pgx.ErrNoRows {
 				return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find forum"})
 			}
 			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
@@ -123,7 +123,7 @@ func (h *Post) EditMessage(ctx echo.Context) error {
 func (h *Post) CreatePosts(ctx echo.Context) error {
 	createdTime := time.Now().Format(time.RFC3339Nano)
 	slugOrIdStr := ctx.Param("slug_or_id")
-	var newPosts []forum.Post
+	newPosts := []forum.Post{}
 	if err := ctx.Bind(&newPosts); err != nil {
 		ctx.Logger().Warn(err)
 		return ctx.JSON(http.StatusBadRequest, forum.ErrorMessage{Message: "Error"})
@@ -142,27 +142,57 @@ func (h *Post) CreatePosts(ctx echo.Context) error {
 			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find thread"})
 		}
 	}
+	if len(newPosts) == 0 {
+		return ctx.JSON(http.StatusCreated, newPosts)
+	}
 	for i := 0; i < len(newPosts); i++ {
-		newPosts[i].Thread = thread.Id
-		newPosts[i].Forum = thread.Forum
-		newPosts[i].Created = createdTime
 		_, err := h.UserService.FindUserByNickName(newPosts[i].Author)
 		if err != nil {
 			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find user"})
 		}
 		if newPosts[i].Parent != 0 {
-			err = h.PostService.FindPostById(newPosts[i].Parent, newPosts[i].Thread)
+			err = h.PostService.FindPostById(newPosts[i].Parent, thread.Id)
 			if err != nil {
 				return ctx.JSON(http.StatusConflict, forum.ErrorMessage{Message: "Can't find post"})
 			}
 		}
-		lastId, err := h.PostService.InsertPost(newPosts[i])
-		if err != nil {
-			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
-		}
-		newPosts[i].Id = lastId
+	}
+/*	err := h.PostService.CheckPosts(thread.Id, newPosts)
+	if err != nil {
+		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: err.Error()})
+	}*/
+	ids, err := h.PostService.CreatePosts(thread.Id, thread.Forum, createdTime, newPosts)
+	if err != nil {
+		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find user"})
+	}
+	for i := 0; i < len(newPosts); i++ {
+		newPosts[i].Thread = thread.Id
+		newPosts[i].Forum = thread.Forum
+		newPosts[i].Created = createdTime
+		newPosts[i].Id = ids[i]
 		newPosts[i].IsEdited = false
 	}
+	/*	for i := 0; i < len(newPosts); i++ {
+			newPosts[i].Thread = thread.Id
+			newPosts[i].Forum = thread.Forum
+			newPosts[i].Created = createdTime
+			_, err := h.UserService.FindUserByNickName(newPosts[i].Author)
+			if err != nil {
+				return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find user"})
+			}
+			if newPosts[i].Parent != 0 {
+				err = h.PostService.FindPostById(newPosts[i].Parent, newPosts[i].Thread)
+				if err != nil {
+					return ctx.JSON(http.StatusConflict, forum.ErrorMessage{Message: "Can't find post"})
+				}
+			}
+			lastId, err := h.PostService.InsertPost(newPosts[i])
+			if err != nil {
+				return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
+			}
+			newPosts[i].Id = lastId
+			newPosts[i].IsEdited = false
+		}*/
 	return ctx.JSON(http.StatusCreated, newPosts)
 }
 
@@ -229,18 +259,26 @@ func (h *Post) CreateVote(ctx echo.Context) error {
 		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find user"})
 	}
 	newVote.ThreadId = thread.Id
-	voted, err := h.ThreadService.FindVote(newVote)
-	if voted {
-		err = h.ThreadService.UpdateVote(newVote)
-		if err != nil {
-			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't vote"})
-		}
+	countUpdatedRows, err := h.ThreadService.UpdateVote(newVote)
+	if err != nil {
+		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't vote"})
 	} else {
-		err = h.ThreadService.InsertVote(newVote)
-		if err != nil {
-			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't vote"})
+		if countUpdatedRows == 0 {
+			err = h.ThreadService.InsertVote(newVote)
+			if err != nil {
+				return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't vote"})
+			}
 		}
 	}
+	//voted, err := h.ThreadService.FindVote(newVote)
+	/*	if voted {
+			err = h.ThreadService.UpdateVote(newVote)
+			if err != nil {
+				return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't vote"})
+			}
+		} else {
+
+		}*/
 
 	thread, err = h.ThreadService.SelectThreadById(newVote.ThreadId)
 	if err != nil {

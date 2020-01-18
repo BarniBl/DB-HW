@@ -1,14 +1,16 @@
 package forum
 
 import (
-	"database/sql"
+	"fmt"
+	"github.com/jackc/pgx"
+	"strings"
 )
 
 type PostService struct {
-	db *sql.DB
+	db *pgx.ConnPool
 }
 
-func NewPostService(db *sql.DB) *PostService {
+func NewPostService(db *pgx.ConnPool) *PostService {
 	return &PostService{db: db}
 }
 
@@ -45,6 +47,53 @@ func (ps *PostService) UpdatePostMessage(newMessage string, id int) (countUpdate
 	if err != nil {
 		return
 	}
-	countUpdateString, err = result.RowsAffected()
+	countUpdateString = result.RowsAffected()
 	return
 }
+
+func (ps *PostService) CreatePosts(threadId int, postForum, created string, posts []Post) (ids []int, err error) {
+	columns := 6
+	placeholders := make([]string, 0, len(posts))
+	args := make([]interface{}, 0, len(posts)*columns)
+	for i, post := range posts {
+		args = append(args, threadId, postForum, post.Parent, post.Author, post.Message, created)
+		placeholders = append(placeholders, fmt.Sprintf(
+			"($%d, $%d, $%d, $%d, $%d, $%d)",
+			i*columns+1, i*columns+2, i*columns+3, i*columns+4, i*columns+5, i*columns+6,
+		))
+	}
+	query := fmt.Sprintf(
+		"insert into post (thread, forum, parent, author, message, created) values %s",
+		strings.Join(placeholders, ","),
+	)
+	query = query + " RETURNING id"
+	rows, err := ps.db.Query(query, args...)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		scanId := 0
+		//var timetz time.Time
+		err = rows.Scan(&scanId)
+		if err != nil {
+			return
+		}
+		//scanPost.Created = timetz.Format(time.RFC3339Nano)
+		ids = append(ids, scanId)
+	}
+	return
+}
+
+/*func (ps *PostService) CheckPosts(threadId int, posts []Post) (err error) {
+	_, err := h.UserService.FindUserByNickName(newPosts[i].Author)
+	if err != nil {
+		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find user"})
+	}
+	if newPosts[i].Parent != 0 {
+		err = h.PostService.FindPostById(newPosts[i].Parent, newPosts[i].Thread)
+		if err != nil {
+			return ctx.JSON(http.StatusConflict, forum.ErrorMessage{Message: "Can't find post"})
+		}
+	}
+}*/

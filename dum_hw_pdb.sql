@@ -153,18 +153,19 @@ ALTER TABLE ONLY public.post ALTER COLUMN id SET DEFAULT nextval('public.post_id
 
 ALTER TABLE ONLY public.thread ALTER COLUMN id SET DEFAULT nextval('public.thread_id_seq'::regclass);
 
+
 --
 -- Name: post_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.post_id_seq', 11, true);
+SELECT pg_catalog.setval('public.post_id_seq', 389862, true);
 
 
 --
 -- Name: thread_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.thread_id_seq', 11, true);
+SELECT pg_catalog.setval('public.thread_id_seq', 10148, true);
 
 
 --
@@ -213,6 +214,13 @@ CREATE UNIQUE INDEX thread_id_uindex ON public.thread USING btree (id);
 
 
 --
+-- Name: thread_slug_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX thread_slug_index ON public.thread USING btree (lower(slug));
+
+
+--
 -- Name: user_email_uindex; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -224,6 +232,13 @@ CREATE UNIQUE INDEX user_email_uindex ON public."user" USING btree (email);
 --
 
 CREATE UNIQUE INDEX user_nick_name_uindex ON public."user" USING btree (nick_name);
+
+
+--
+-- Name: vote_nick_name_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX vote_nick_name_index ON public.vote USING btree (lower(nick_name), thread_id);
 
 
 --

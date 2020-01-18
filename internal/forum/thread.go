@@ -3,15 +3,16 @@ package forum
 import (
 	"database/sql"
 	"fmt"
+	"github.com/jackc/pgx"
 	"strconv"
 	"time"
 )
 
 type ThreadService struct {
-	db *sql.DB
+	db *pgx.ConnPool
 }
 
-func NewThreadService(db *sql.DB) *ThreadService {
+func NewThreadService(db *pgx.ConnPool) *ThreadService {
 	return &ThreadService{db: db}
 }
 
@@ -108,11 +109,7 @@ func (ts *ThreadService) SelectThreadByForumDesc(forum string, limit int, since 
 		return
 	}
 
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil {
-			err = closeErr
-		}
-	}()
+	defer rows.Close()
 
 	for rows.Next() {
 		threadScan := Thread{}
@@ -134,7 +131,7 @@ func (ts *ThreadService) SelectThreadByForumDesc(forum string, limit int, since 
 }
 
 func (ts *ThreadService) SelectThreadByForum(forum string, limit int, since string, desc bool) (threads []Thread, err error) {
-	var rows *sql.Rows
+	var rows *pgx.Rows
 	if since == "" && !desc {
 		sqlQuery := `SELECT t.author, t.created, t.id, t.forum, t.message, t.slug, t.title
 		FROM public.thread as t 
@@ -165,11 +162,7 @@ func (ts *ThreadService) SelectThreadByForum(forum string, limit int, since stri
 		rows, err = ts.db.Query(sqlQuery, forum, limit, since)
 	}
 
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil {
-			err = closeErr
-		}
-	}()
+	defer rows.Close()
 
 	for rows.Next() {
 		threadScan := Thread{}
@@ -213,11 +206,15 @@ func (ts *ThreadService) InsertVote(vote Vote) (err error) {
 	return
 }
 
-func (ts *ThreadService) UpdateVote(vote Vote) (err error) {
+func (ts *ThreadService) UpdateVote(vote Vote) (countUpdatedRows int64, err error) {
 	sqlQuery := `
 	UPDATE public.vote SET voice = $1
-	where vote.nick_name = $2 AND vote.thread_id = $3`
-	_, err = ts.db.Exec(sqlQuery, vote.Voice, vote.NickName, vote.ThreadId)
+	where lower(vote.nick_name) = lower($2) AND vote.thread_id = $3`
+	result, err := ts.db.Exec(sqlQuery, vote.Voice, vote.NickName, vote.ThreadId)
+	if err != nil {
+		return
+	}
+	countUpdatedRows = result.RowsAffected()
 	return
 }
 
@@ -242,7 +239,7 @@ func (ts *ThreadService) FindVote(vote Vote) (voted bool, err error) {
 func (ts *ThreadService) SelectPosts(threadID int, limit, since, sort, desc string) (Posts []Post, Err error) {
 	posts := []Post{}
 
-	var rows *sql.Rows
+	var rows *pgx.Rows
 	var err error
 	if sort == "flat" {
 		if desc == "false" {
