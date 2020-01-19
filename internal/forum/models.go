@@ -3,6 +3,7 @@ package forum
 import "time"
 
 type User struct {
+	Id       int    `json:"-"`
 	About    string `json:"about"`
 	Email    string `json:"email"`
 	FullName string `json:"fullname"`
@@ -10,8 +11,10 @@ type User struct {
 }
 
 type Forum struct {
+	Id      int    `json:"-"`
 	Slug    string `json:"slug"`
 	Title   string `json:"title"`
+	UserId  int    `json:"-"`
 	User    string `json:"user"`
 	Posts   int    `json:"posts"`
 	Threads int    `json:"threads"`
@@ -23,6 +26,7 @@ type Thread struct {
 	Author  string    `json:"author"`
 	Created time.Time `json:"created"`
 	Forum   string    `json:"forum"`
+	ForumId int       `json:"-"`
 	Id      int       `json:"id"`
 	Message string    `json:"message"`
 	Slug    string    `json:"slug"`
@@ -31,18 +35,21 @@ type Thread struct {
 }
 
 type Post struct {
-	Author   string `json:"author"`
-	Created  string `json:"created"`
-	Forum    string `json:"forum"`
-	Id       int    `json:"id"`
-	IsEdited bool   `json:"isEdited"`
-	Message  string `json:"message"`
-	Parent   int    `json:"parent"`
-	Thread   int    `json:"thread"`
+	Author        string  `json:"author"`
+	Created       string  `json:"created"`
+	Forum         string  `json:"forum"`
+	Id            int     `json:"id"`
+	IsEdited      bool    `json:"isEdited"`
+	Message       string  `json:"message"`
+	Parent        int     `json:"parent"`
+	Thread        int     `json:"thread"`
+	Path          []int64 `json:"-"`
+	ParentPointer *Post   `json:"-"`
 }
 
 type Vote struct {
 	NickName string `json:"nickname"`
+	UserId   int    `json:"-"`
 	Voice    int    `json:"voice"`
 	ThreadId int    `json:"-"`
 }

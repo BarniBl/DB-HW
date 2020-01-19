@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/jackc/pgx"
-	"strconv"
+	"github.com/lib/pq"
 	"time"
 )
 
@@ -43,49 +43,27 @@ func (ts *ThreadService) SelectThreadByTitleAndForum(title string, forum string)
 }
 
 func (ts *ThreadService) SelectThreadBySlug(threadSlug string) (thread Thread, err error) {
-	sqlQuery := `SELECT t.id, t.author, t.created, t.id, t.forum, t.message, t.slug, t.title
+	sqlQuery := `SELECT t.id, t.author, t.created, t.forum, t.message, t.slug, t.title, t.votes
 	FROM public.thread as t 
 	where Lower(t.slug) = Lower($1) `
 	var slug sql.NullString
-	err = ts.db.QueryRow(sqlQuery, threadSlug).Scan(&thread.Id, &thread.Author, &thread.Created, &thread.Id, &thread.Forum, &thread.Message, &slug, &thread.Title)
+	err = ts.db.QueryRow(sqlQuery, threadSlug).Scan(&thread.Id, &thread.Author, &thread.Created, &thread.Forum, &thread.Message, &slug, &thread.Title, &thread.Votes)
 	if err != nil {
 		return
 	}
 	if slug.Valid {
 		thread.Slug = slug.String
 	}
-	sqlQuery = `SELECT sum(v.voice)
-	FROM public.vote as v
-	where v.thread_id = $1`
-	var votes sql.NullInt64
-	err = ts.db.QueryRow(sqlQuery, thread.Id).Scan(&votes)
-	if err != nil {
-		return
-	}
-	if votes.Valid {
-		thread.Votes = int(votes.Int64)
-	}
 	return
 }
 
 func (ts *ThreadService) SelectThreadById(id int) (thread Thread, err error) {
-	sqlQuery := `SELECT t.author, t.created, t.id, t.forum, t.message, t.slug, t.title
+	sqlQuery := `SELECT t.author, t.created, t.id, t.forum, t.message, t.slug, t.title, t.votes
 	FROM public.thread as t 
 	where t.id = $1`
-	err = ts.db.QueryRow(sqlQuery, id).Scan(&thread.Author, &thread.Created, &thread.Id, &thread.Forum, &thread.Message, &thread.Slug, &thread.Title)
+	err = ts.db.QueryRow(sqlQuery, id).Scan(&thread.Author, &thread.Created, &thread.Id, &thread.Forum, &thread.Message, &thread.Slug, &thread.Title, &thread.Votes)
 	if err != nil {
 		return
-	}
-	sqlQuery = `SELECT sum(v.voice)
-	FROM public.vote as v
-	where v.thread_id = $1`
-	var votes sql.NullInt64
-	err = ts.db.QueryRow(sqlQuery, thread.Id).Scan(&votes)
-	if err != nil {
-		return
-	}
-	if votes.Valid {
-		thread.Votes = int(votes.Int64)
 	}
 	return
 }
@@ -133,28 +111,32 @@ func (ts *ThreadService) SelectThreadByForumDesc(forum string, limit int, since 
 func (ts *ThreadService) SelectThreadByForum(forum string, limit int, since string, desc bool) (threads []Thread, err error) {
 	var rows *pgx.Rows
 	if since == "" && !desc {
-		sqlQuery := `SELECT t.author, t.created, t.id, t.forum, t.message, t.slug, t.title
+		sqlQuery := `
+		SELECT t.author, t.created, t.id, t.message, t.slug, t.title, t.votes
 		FROM public.thread as t 
 		WHERE lower(t.forum) = lower($1)
 		ORDER BY t.created 
 		LIMIT $2`
 		rows, err = ts.db.Query(sqlQuery, forum, limit)
 	} else if since != "" && !desc {
-		sqlQuery := `SELECT t.author, t.created, t.id, t.forum, t.message, t.slug, t.title
+		sqlQuery := `
+		SELECT t.author, t.created, t.id, t.message, t.slug, t.title, t.votes
 		FROM public.thread as t 
 		WHERE lower(t.forum) = lower($1) AND t.created >= $3
 		ORDER BY t.created 
 		LIMIT $2`
 		rows, err = ts.db.Query(sqlQuery, forum, limit, since)
 	} else if since == "" && desc {
-		sqlQuery := `SELECT t.author, t.created, t.id, t.forum, t.message, t.slug, t.title
+		sqlQuery := `
+		SELECT t.author, t.created, t.id, t.message, t.slug, t.title, t.votes
 		FROM public.thread as t 
 		WHERE lower(t.forum) = lower($1)
 		ORDER BY t.created DESC 
 		LIMIT $2`
 		rows, err = ts.db.Query(sqlQuery, forum, limit)
 	} else {
-		sqlQuery := `SELECT t.author, t.created, t.id, t.forum, t.message, t.slug, t.title
+		sqlQuery := `
+		SELECT t.author, t.created, t.id, t.message, t.slug, t.title, t.votes
 		FROM public.thread as t 
 		WHERE lower(t.forum) = lower($1) AND t.created <= $3
 		ORDER BY t.created DESC 
@@ -167,17 +149,14 @@ func (ts *ThreadService) SelectThreadByForum(forum string, limit int, since stri
 	for rows.Next() {
 		threadScan := Thread{}
 		slug := sql.NullString{}
-		err := rows.Scan(&threadScan.Author, &threadScan.Created, &threadScan.Id, &threadScan.Forum, &threadScan.Message, &slug, &threadScan.Title)
+		err := rows.Scan(&threadScan.Author, &threadScan.Created, &threadScan.Id, &threadScan.Message, &slug, &threadScan.Title, &threadScan.Votes)
 		if err != nil {
 			return threads, err
 		}
 		if slug.Valid {
 			threadScan.Slug = slug.String
 		}
-		sqlQuery := `SELECT sum(v.voice)
-		FROM public.vote as v
-		where v.thread_id = $1`
-		err = ts.db.QueryRow(sqlQuery, threadScan.Id).Scan(&threadScan.Votes)
+		threadScan.Forum = forum
 		threads = append(threads, threadScan)
 	}
 	return
@@ -200,17 +179,26 @@ func (ts *ThreadService) FindThreadById(id int) (thread Thread, err error) {
 }
 
 func (ts *ThreadService) InsertVote(vote Vote) (err error) {
-	sqlQuery := `INSERT INTO public.vote (nick_name, voice, thread_id)
+	sqlQuery := `INSERT INTO public.vote (user_id, voice, thread_id)
 	VALUES ($1,$2,$3)`
-	_, err = ts.db.Exec(sqlQuery, vote.NickName, vote.Voice, vote.ThreadId)
+	_, err = ts.db.Exec(sqlQuery, vote.UserId, vote.Voice, vote.ThreadId)
+	return
+}
+
+func (ts *ThreadService) SelectVote(vote Vote) (findVote Vote, err error) {
+	sqlQuery := `
+	SELECT v.user_id, v.voice, v.thread_id 
+	FROM public.vote as v
+	where v.user_id = $2 AND v.thread_id = $1`
+	err = ts.db.QueryRow(sqlQuery, vote.ThreadId, vote.UserId).Scan(&findVote.UserId, &findVote.Voice, &findVote.ThreadId)
 	return
 }
 
 func (ts *ThreadService) UpdateVote(vote Vote) (countUpdatedRows int64, err error) {
 	sqlQuery := `
 	UPDATE public.vote SET voice = $1
-	where lower(vote.nick_name) = lower($2) AND vote.thread_id = $3`
-	result, err := ts.db.Exec(sqlQuery, vote.Voice, vote.NickName, vote.ThreadId)
+	where vote.user_id = $2 AND vote.thread_id = $3`
+	result, err := ts.db.Exec(sqlQuery, vote.Voice, vote.UserId, vote.ThreadId)
 	if err != nil {
 		return
 	}
@@ -237,276 +225,63 @@ func (ts *ThreadService) FindVote(vote Vote) (voted bool, err error) {
 }
 
 func (ts *ThreadService) SelectPosts(threadID int, limit, since, sort, desc string) (Posts []Post, Err error) {
-	posts := []Post{}
+	var sqlQuery string
 
-	var rows *pgx.Rows
-	var err error
+	conditionSign := ">"
+	if desc == "desc" {
+		conditionSign = "<"
+	}
+
 	if sort == "flat" {
-		if desc == "false" {
-			sqlQuery := "SELECT p.author, p.created, p.forum, p.id, p.is_edited, p.message, p.parent, p.thread " +
-				"FROM public.post as p WHERE p.thread = $1 AND p.id > $3 ORDER BY p.id LIMIT $2"
-			rows, err = ts.db.Query(sqlQuery, threadID, limit, since)
-		} else {
-			sqlQuery := "SELECT p.author, p.created, p.forum, p.id, p.is_edited, p.message, p.parent, p.thread " +
-				"FROM public.post as p WHERE p.thread = $1 AND p.id < $3 ORDER BY p.id DESC LIMIT $2"
-			rows, err = ts.db.Query(sqlQuery, threadID, limit, since)
+		sqlQuery = "SELECT p.id, p.parent, p.thread, p.forum, p.author, p.created, p.message, p.is_edited, p.path FROM public.post as p WHERE thread = $1 "
+		if since != "" {
+			sqlQuery += fmt.Sprintf(" AND id %s %s ", conditionSign, since)
 		}
-
+		sqlQuery += fmt.Sprintf(" ORDER BY p.created %s, p.id %s LIMIT %s", desc, desc, limit)
 	} else if sort == "tree" {
-		if desc == "false" {
-			if since != "0" && since != "999999999" {
-				sqlQuery := "WITH RECURSIVE temp1 (author, created, forum, id, is_edited, message, parent, thread, PATH, LEVEL, root ) AS ( " +
-					"SELECT T1.author, T1.created, T1.forum, T1.id, T1.is_edited, T1.message, T1.parent, T1.thread, CAST (10000 + T1.id AS VARCHAR (50)) as PATH, 1, T1.id as root " +
-					"FROM public.post as T1 WHERE T1.parent = 0 and T1.thread = $1 " +
-					"union " +
-					"select T2.author, T2.created, T2.forum, T2.id, T2.is_edited, T2.message, T2.parent, T2.thread, CAST ( temp1.PATH ||'->'|| 10000 + T2.id AS VARCHAR(50)), LEVEL + 1, root " +
-					"FROM public.post T2 INNER JOIN temp1 ON( temp1.id = T2.parent) " +
-					") " +
-					"select author, created, forum, id, is_edited, message, parent, thread from temp1 ORDER BY root, PATH LIMIT $2;"
-				rows, err = ts.db.Query(sqlQuery, threadID, 100000)
-			} else {
-				sqlQuery := "WITH RECURSIVE temp1 (author, created, forum, id, is_edited, message, parent, thread, PATH, LEVEL, root ) AS ( " +
-					"SELECT T1.author, T1.created, T1.forum, T1.id, T1.is_edited, T1.message, T1.parent, T1.thread, CAST (10000 + T1.id AS VARCHAR (50)) as PATH, 1, T1.id as root " +
-					"FROM public.post as T1 WHERE T1.parent = 0 and T1.thread = $1 " +
-					"union " +
-					"select T2.author, T2.created, T2.forum, T2.id, T2.is_edited, T2.message, T2.parent, T2.thread, CAST ( temp1.PATH ||'->'|| 10000 + T2.id AS VARCHAR(50)), LEVEL + 1, root " +
-					"FROM public.post T2 INNER JOIN temp1 ON( temp1.id = T2.parent) " +
-					") " +
-					"select author, created, forum, id, is_edited, message, parent, thread from temp1 ORDER BY root, PATH LIMIT $2;"
-				rows, err = ts.db.Query(sqlQuery, threadID, limit)
-			}
-		} else {
-			if since != "0" && since != "999999999" {
-				sqlQuery := "WITH RECURSIVE temp1 (author, created, forum, id, is_edited, message, parent, thread, PATH, LEVEL, root ) AS ( " +
-					"SELECT T1.author, T1.created, T1.forum, T1.id, T1.is_edited, T1.message, T1.parent, T1.thread, CAST (1000000 + T1.id AS VARCHAR (50)) as PATH, 1, T1.id as root " +
-					"FROM public.post as T1 WHERE T1.parent = 0 AND T1.thread = $1" +
-					"union " +
-					"select  T2.author, T2.created, T2.forum, T2.id, T2.is_edited, T2.message, T2.parent, T2.thread, CAST (temp1.PATH ||'->'|| T2.id AS VARCHAR(50)), LEVEL + 1, root " +
-					"FROM public.post as T2 INNER JOIN temp1 ON (temp1.id = T2.parent) " +
-					") " +
-					"select author, created, forum, id, is_edited, message, parent, thread from temp1 ORDER BY PATH;"
-				rows, err = ts.db.Query(sqlQuery, threadID)
-			} else {
-				sqlQuery := "WITH RECURSIVE temp1 (author, created, forum, id, is_edited, message, parent, thread, PATH, LEVEL, root ) AS ( " +
-					"SELECT T1.author, T1.created, T1.forum, T1.id, T1.is_edited, T1.message, T1.parent, T1.thread, CAST (1000000 + T1.id AS VARCHAR (50)) as PATH, 1, T1.id as root " +
-					"FROM public.post as T1 WHERE T1.parent = 0 AND T1.thread = $1" +
-					"union " +
-					"select  T2.author, T2.created, T2.forum, T2.id, T2.is_edited, T2.message, T2.parent, T2.thread, CAST (temp1.PATH ||'->'|| T2.id AS VARCHAR(50)), LEVEL + 1, root " +
-					"FROM public.post as T2 INNER JOIN temp1 ON (temp1.id = T2.parent) " +
-					") " +
-					"select author, created, forum, id, is_edited, message, parent, thread from temp1 WHERE id < $3 ORDER BY PATH DESC LIMIT $2;"
-				rows, err = ts.db.Query(sqlQuery, threadID, limit, 1000000)
-			}
+		orderString := fmt.Sprintf(" ORDER BY p.path[1] %s, p.path %s ", desc, desc)
+		sqlQuery = "SELECT p.id, p.parent, p.thread, p.forum, p.author, p.created, p.message, p.is_edited, p.path " +
+			"FROM public.post as p " +
+			"WHERE p.thread = $1 "
+		if since != "" {
+			sqlQuery += fmt.Sprintf(" AND p.path %s (SELECT p.path FROM public.post as p WHERE p.id = %s) ", conditionSign, since)
 		}
+		sqlQuery += orderString
+		sqlQuery += fmt.Sprintf("LIMIT %s", limit)
+
 	} else if sort == "parent_tree" {
-		if desc == "false" {
-			sqlQuery := "WITH RECURSIVE temp1 (author, created, forum, id, is_edited, message, parent, thread, PATH, LEVEL, root ) AS ( " +
-				"SELECT T1.author, T1.created, T1.forum, T1.id, T1.is_edited, T1.message, T1.parent, T1.thread, CAST (10000 + T1.id AS VARCHAR (50)) as PATH, 1, T1.id as root " +
-				"FROM public.post as T1 WHERE T1.parent = 0 AND T1.thread = $1" +
-				"union " +
-				"select T2.author, T2.created, T2.forum, T2.id, T2.is_edited, T2.message, T2.parent, T2.thread, CAST ( temp1.PATH ||'->'|| 10000 + T2.id AS VARCHAR(50)), LEVEL + 1, root " +
-				"FROM public.post T2 INNER JOIN temp1 ON( temp1.id = T2.parent) " +
-				") " +
-				"select author, created, forum, id, is_edited, message, parent, thread from temp1 ORDER BY root, PATH;"
-			rows, err = ts.db.Query(sqlQuery, threadID)
-		} else {
-			sqlQuery := "WITH RECURSIVE temp1 (author, created, forum, id, is_edited, message, parent, thread, PATH, LEVEL, root ) AS ( " +
-				"SELECT T1.author, T1.created, T1.forum, T1.id, T1.is_edited, T1.message, T1.parent, T1.thread, CAST (10000 + T1.id AS VARCHAR (50)) as PATH, 1, T1.id as root " +
-				"FROM public.post as T1 WHERE T1.parent = 0 AND T1.thread = $1" +
-				"union " +
-				"select  T2.author, T2.created, T2.forum, T2.id, T2.is_edited, T2.message, T2.parent, T2.thread, CAST ( temp1.PATH ||'->'|| 10000 + T2.id AS VARCHAR(50)), LEVEL + 1, root " +
-				"FROM public.post as T2 INNER JOIN temp1 ON( temp1.id = T2.parent) " +
-				") " +
-				"select author, created, forum, id, is_edited, message, parent, thread  from temp1 ORDER BY root desc, PATH;"
-			rows, err = ts.db.Query(sqlQuery, threadID)
+		sqlQuery = "SELECT p.id, p.parent, p.thread, p.forum, p.author, p.created, p.message, p.is_edited, p.path " +
+			"FROM public.post as p " +
+			"WHERE p.thread = $1 AND p.path::integer[] && (SELECT ARRAY (select p.id from public.post as p WHERE p.thread = $1 AND p.parent = 0 "
+		if since != "" {
+			sqlQuery += fmt.Sprintf(" AND p.path %s (SELECT p.path[1:1] FROM public.post as p WHERE p.id = %s) ", conditionSign, since)
 		}
+		sqlQuery += fmt.Sprintf("ORDER BY p.path[1] %s, p.path LIMIT %s)) ", desc, limit)
+		sqlQuery += fmt.Sprintf("ORDER BY p.path[1] %s, p.path ", desc)
 	}
 
-	if sort != "parent_tree" {
-		defer rows.Close()
+	rows, err := ts.db.Query(sqlQuery, threadID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		p := Post{}
+		err := rows.Scan(&p.Id, &p.Parent, &p.Thread, &p.Forum, &p.Author, &p.Created, &p.Message, &p.IsEdited, pq.Array(&p.Path))
 		if err != nil {
-			fmt.Println(err)
-			return posts, err
+			return nil, err
 		}
 
-		for rows.Next() {
-			scanPost := Post{}
-			//var timetz time.Time
-			err := rows.Scan(&scanPost.Author, &scanPost.Created, &scanPost.Forum,
-				&scanPost.Id, &scanPost.IsEdited, &scanPost.Message, &scanPost.Parent,
-				&scanPost.Thread)
-			if err != nil {
-				return posts, err
-			}
-			//scanPost.Created = timetz.Format(time.RFC3339Nano)
-			posts = append(posts, scanPost)
-		}
-	} else {
-		if err != nil {
-			rows.Close()
-			return posts, err
-		}
-
-		count := 0
-		limitDigit, _ := strconv.Atoi(limit)
-
-		for rows.Next() {
-			scanPost := Post{}
-			//var timetz time.Time
-			err := rows.Scan(&scanPost.Author, &scanPost.Created, &scanPost.Forum,
-				&scanPost.Id, &scanPost.IsEdited, &scanPost.Message, &scanPost.Parent,
-				&scanPost.Thread)
-			if err != nil {
-				return posts, err
-			}
-
-			if scanPost.Parent == 0 {
-				count = count + 1
-			}
-			if count > limitDigit && (since == "0" || since == "999999999") {
-				break
-			} else {
-				//scanPost.Created = timetz.Format(time.RFC3339Nano)
-				posts = append(posts, scanPost)
-			}
-
-		}
-		rows.Close()
+		Posts = append(Posts, p)
 	}
 
-	if since != "0" && since != "999999999" && sort == "tree" {
-		limitDigit, _ := strconv.Atoi(limit)
-		sinceDigit, _ := strconv.Atoi(since)
-		var sincePosts []Post
-		counter := 0
-		//for ; posts[counter].ID <= sinceDigit && counter < len(posts); {
-		//	counter++
-		//}
-		if desc == "false" {
-			startIndex := 1000000000
-			//postMinStartIndex
-			minValue := 100000000000
-			for i := 0; i < len(posts); i++ {
-				if (posts[i].Id == sinceDigit) {
-					startIndex = i + 1
-					break
-				}
-				if (posts[i].Id > sinceDigit) && (posts[i].Id < minValue) {
-					startIndex = i
-					minValue = posts[i].Id
-				}
-			}
-			sincePostsCount := 0
-			counter = startIndex
-			for ; sincePostsCount < limitDigit && counter < len(posts); {
-				scanPost := Post{}
-				scanPost = posts[counter]
-				sincePosts = append(sincePosts, scanPost)
-				if sort == "tree" {
-					sincePostsCount++
-				} else {
-					if scanPost.Parent == 0 {
-						sincePostsCount++
-					}
-				}
-				counter++
-			}
-		} else {
-			startIndex := -1000000000
-			//postMinStartIndex
-			maxValue := 0
-			for i := len(posts) - 1; i >= 0; i-- {
-				if (posts[i].Id == sinceDigit) {
-					startIndex = i - 1
-					break
-				}
-				if (posts[i].Id < sinceDigit) && (posts[i].Id > maxValue) {
-					startIndex = i
-					maxValue = posts[i].Id
-				}
-			}
+	return
+}
 
-			//xsort.Slice(posts[0:startIndex], func(i, j int) bool { return posts[i].ID < posts[j].ID})
-			sincePostsCount := 0
-			counter = startIndex
-			for ; sincePostsCount < limitDigit && counter >= 0; {
-				scanPost := Post{}
-				scanPost = posts[counter]
-				sincePosts = append(sincePosts, scanPost)
-				if sort == "tree" {
-					sincePostsCount++
-				} else {
-					if scanPost.Parent == 0 {
-						sincePostsCount++
-					}
-				}
-				counter--
-			}
-		}
-		return sincePosts, nil
-	}
-
-	if since != "0" && since != "999999999" && sort == "parent_tree" {
-		limitDigit, _ := strconv.Atoi(limit)
-		sinceDigit, _ := strconv.Atoi(since)
-		var sincePosts []Post
-		counter := 0
-		if desc == "false" {
-			startIndex := 1000000000
-			minValue := 100000000000
-			for i := 0; i < len(posts); i++ {
-				if (posts[i].Id == sinceDigit) {
-					startIndex = i + 1
-					break
-				}
-				if (posts[i].Id > sinceDigit) && (posts[i].Id < minValue) {
-					startIndex = i
-					minValue = posts[i].Id
-				}
-			}
-			sincePostsCount := 0
-			counter = startIndex
-			for ; sincePostsCount < limitDigit && counter < len(posts); {
-				scanPost := Post{}
-				scanPost = posts[counter]
-				sincePosts = append(sincePosts, scanPost)
-				sincePostsCount++
-				counter++
-			}
-		} else {
-			startIndex := -1000000000
-			//postMinStartIndex
-			maxValue := 100000000000
-			for i := len(posts) - 1; i >= 0; i-- {
-				if (posts[i].Id == sinceDigit) {
-					startIndex = i + 1
-					break
-				}
-				if (posts[i].Id < sinceDigit) && (posts[i].Id < maxValue) {
-					startIndex = i
-					maxValue = posts[i].Id
-				}
-			}
-
-			//xsort.Slice(posts[0:startIndex], func(i, j int) bool { return posts[i].ID < posts[j].ID})
-			sincePostsCount := 0
-			counter = startIndex
-			for ; sincePostsCount < limitDigit && counter < len(posts); {
-				scanPost := Post{}
-				scanPost = posts[counter]
-				sincePosts = append(sincePosts, scanPost)
-				if sort == "tree" {
-					sincePostsCount++
-				} else {
-					if scanPost.Parent == 0 {
-						sincePostsCount++
-					}
-				}
-				counter++
-			}
-		}
-		return sincePosts, nil
-	}
-
-	return posts, nil
+func (ts *ThreadService) UpdateVoteCount(vote Vote) (err error) {
+	sqlQuery := `
+	UPDATE public.thread SET votes = votes + $1
+	where thread.id = $2`
+	_, err = ts.db.Exec(sqlQuery, vote.Voice, vote.ThreadId)
+	return
 }

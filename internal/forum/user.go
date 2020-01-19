@@ -17,7 +17,7 @@ func NewUserService(db *pgx.ConnPool) *UserService {
 }
 
 func (us *UserService) SelectUserByNickNameOrEmail(nickName, email string) (users []User, err error) {
-	sqlQuery := `SELECT u.nick_name, u.email, u.full_name, u.about
+	sqlQuery := `SELECT u.id, u.nick_name, u.email, u.full_name, u.about
 	FROM public.user as u 
 	where lower(u.nick_name) = lower($1) or lower(u.email) = lower($2)`
 	rows, err := us.db.Query(sqlQuery, nickName, email)
@@ -29,7 +29,7 @@ func (us *UserService) SelectUserByNickNameOrEmail(nickName, email string) (user
 
 	for rows.Next() {
 		userScan := User{}
-		err := rows.Scan(&userScan.NickName, &userScan.Email, &userScan.FullName, &userScan.About)
+		err := rows.Scan(&userScan.Id, &userScan.NickName, &userScan.Email, &userScan.FullName, &userScan.About)
 		if err != nil {
 			return users, err
 		}
@@ -74,26 +74,67 @@ func (us *UserService) SelectUsersByForumDesc(forum string, limit int, since str
 	return users, nil
 }
 
-func (us *UserService) SelectUsersByForum(forum string, limit int, since string) (users []User, err error) {
-	sqlQuery := `
-	SELECT distinct LOWER(nick_name) COLLATE "C", nick_name, email, full_name, about
-	FROM public.user as u
-			 LEFT JOIN public.post as p ON lower(p.author) = lower(nick_name)
-			 LEFT JOIN public.thread as t ON lower(t.author) = lower(nick_name)
-	WHERE lower(nick_name) > lower($3) COLLATE "C" AND (lower(p.forum) = lower($1) OR lower(t.forum) = lower($1))
-	ORDER BY LOWER(nick_name) COLLATE "C" ASC
-	LIMIT $2`
-	rows, err := us.db.Query(sqlQuery, forum, limit, since)
-	if err != nil {
-		return
+func (us *UserService) SelectUsersByForum(forumId int, limit int, since string, desc string) (users []User, err error) {
+	var rows *pgx.Rows
+	if since == "" {
+		if desc == "false" {
+			sqlQuery := `
+		SELECT u.nick_name, u.email, u.full_name, u.about
+		FROM public.user as u
+		JOIN public.forum_user as fu ON fu.user_id = u.id
+		WHERE fu.forum_id = $1
+		ORDER BY LOWER(nick_name) COLLATE "C" ASC
+		LIMIT $2`
+			rows, err = us.db.Query(sqlQuery, forumId, limit)
+			if err != nil {
+				return
+			}
+		} else {
+			sqlQuery := `
+		SELECT u.nick_name, u.email, u.full_name, u.about
+		FROM public.user as u
+		JOIN public.forum_user as fu ON fu.user_id = u.id
+		WHERE fu.forum_id = $1
+		ORDER BY LOWER(nick_name) COLLATE "C" DESC
+		LIMIT $2`
+			rows, err = us.db.Query(sqlQuery, forumId, limit)
+			if err != nil {
+				return
+			}
+		}
+	} else {
+		if desc == "false" {
+			sqlQuery := `
+		SELECT u.nick_name, u.email, u.full_name, u.about
+		FROM public.user as u
+		JOIN public.forum_user as fu ON fu.user_id = u.id
+		WHERE fu.forum_id = $1 AND LOWER(nick_name) > lower($3)
+		ORDER BY LOWER(nick_name) COLLATE "C" ASC
+		LIMIT $2`
+			rows, err = us.db.Query(sqlQuery, forumId, limit, since)
+			if err != nil {
+				return
+			}
+		} else {
+			sqlQuery := `
+		SELECT u.nick_name, u.email, u.full_name, u.about
+		FROM public.user as u
+		JOIN public.forum_user as fu ON fu.user_id = u.id
+		WHERE fu.forum_id = $1 AND LOWER(nick_name) < lower($3)
+		ORDER BY LOWER(nick_name) COLLATE "C" DESC
+		LIMIT $2`
+			rows, err = us.db.Query(sqlQuery, forumId, limit, since)
+			if err != nil {
+				return
+			}
+		}
 	}
 
 	defer rows.Close()
 
 	for rows.Next() {
 		user := User{}
-		temp := ""
-		err := rows.Scan(&temp, &user.NickName, &user.Email, &user.FullName, &user.About)
+		err := rows.Scan(&user.NickName, &user.Email, &user.FullName, &user.About)
 		if err != nil {
 			return users, err
 		}
@@ -145,19 +186,19 @@ func (us *UserService) UpdateUser(user User) error {
 	SET email = $1, 
 		full_name = $2, 	
 		about = $3
-		WHERE nick_name = $4`
-	_, err := us.db.Exec(sqlQuery, user.Email, user.FullName, user.About, user.NickName)
+		WHERE id = $4`
+	_, err := us.db.Exec(sqlQuery, user.Email, user.FullName, user.About, user.Id)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (us *UserService) FindUserByNickName(nickName string) (findNickName string, err error) {
-	sqlQuery := `SELECT u.nick_name
+func (us *UserService) FindUserByNickName(nickName string) (user User, err error) {
+	sqlQuery := `SELECT u.id, u.nick_name
 	FROM public.user as u 
 	where lower(u.nick_name) = lower($1)`
-	err = us.db.QueryRow(sqlQuery, nickName).Scan(&findNickName)
+	err = us.db.QueryRow(sqlQuery, nickName).Scan(&user.Id, &user.NickName)
 	return
 }
 

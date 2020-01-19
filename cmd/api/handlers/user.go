@@ -83,6 +83,7 @@ func (h *User) EditProfile(ctx echo.Context) (Err error) {
 	if userSlice[0].NickName != editUser.NickName {
 		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Error"})
 	}
+	editUser.Id = userSlice[0].Id
 	if editUser.About == "" {
 		editUser.About = userSlice[0].About
 	}

@@ -1,8 +1,9 @@
 package forum
 
 import (
-	"fmt"
 	"github.com/jackc/pgx"
+	"github.com/pkg/errors"
+	"strconv"
 	"strings"
 )
 
@@ -51,49 +52,112 @@ func (ps *PostService) UpdatePostMessage(newMessage string, id int) (countUpdate
 	return
 }
 
-func (ps *PostService) CreatePosts(threadId int, postForum, created string, posts []Post) (ids []int, err error) {
-	columns := 6
-	placeholders := make([]string, 0, len(posts))
-	args := make([]interface{}, 0, len(posts)*columns)
-	for i, post := range posts {
-		args = append(args, threadId, postForum, post.Parent, post.Author, post.Message, created)
-		placeholders = append(placeholders, fmt.Sprintf(
-			"($%d, $%d, $%d, $%d, $%d, $%d)",
-			i*columns+1, i*columns+2, i*columns+3, i*columns+4, i*columns+5, i*columns+6,
-		))
-	}
-	query := fmt.Sprintf(
-		"insert into public.post (thread, forum, parent, author, message, created) values %s",
-		strings.Join(placeholders, ","),
-	)
-	query = query + " RETURNING id"
-	rows, err := ps.db.Query(query, args...)
+func (ps *PostService) CreatePosts(thread Thread, forumId int, created string, posts []Post) (post []Post, err error) {
+	tx, err := ps.db.Begin()
 	if err != nil {
-		return
+		return nil, err
 	}
-	defer rows.Close()
-	for rows.Next() {
-		scanId := 0
-		//var timetz time.Time
-		err = rows.Scan(&scanId)
+
+	//now := time.Now()
+
+	sqlStr := "INSERT INTO post(id, parent, thread, forum, author, created, message, path) VALUES "
+	vals := []interface{}{}
+	for _, post := range posts {
+		var authorId int
+		err = ps.db.QueryRow(`SELECT id FROM public."user" WHERE LOWER(nick_name) = LOWER($1)`,
+			post.Author,
+		).Scan(&authorId)
 		if err != nil {
-			return
+			_ = tx.Rollback()
+			return nil, errors.New("404")
 		}
-		//scanPost.Created = timetz.Format(time.RFC3339Nano)
-		ids = append(ids, scanId)
+		sqlQuery := `
+		INSERT INTO public.forum_user (forum_id, user_id)
+		VALUES ($1,$2)`
+		_, err = ps.db.Exec(sqlQuery, forumId, authorId)
+
+		if post.Parent == 0 {
+			sqlStr += "(nextval('post_id_seq'::regclass), ?, ?, ?, ?, ?, ?, " +
+				"ARRAY[currval(pg_get_serial_sequence('post', 'id'))::bigint]),"
+			vals = append(vals, post.Parent, thread.Id, thread.Forum, post.Author, created, post.Message)
+		} else {
+			var parentThreadId int32
+			err = ps.db.QueryRow("SELECT post.thread FROM public.post WHERE post.id = $1",
+				post.Parent,
+			).Scan(&parentThreadId)
+			if err != nil {
+				_ = tx.Rollback()
+				return nil, err
+			}
+			if parentThreadId != int32(thread.Id) {
+				_ = tx.Rollback()
+				return nil, errors.New("Parent post was created in another thread")
+			}
+
+			sqlStr += " (nextval('post_id_seq'::regclass), ?, ?, ?, ?, ?, ?, " +
+				"(SELECT post.path FROM public.post WHERE post.id = ? AND post.thread = ?) || " +
+				"currval(pg_get_serial_sequence('post', 'id'))::bigint),"
+
+			vals = append(vals, post.Parent, thread.Id, thread.Forum, post.Author, created, post.Message, post.Parent, thread.Id)
+		}
+
 	}
-	return
+	sqlStr = strings.TrimSuffix(sqlStr, ",")
+
+	sqlStr += " RETURNING  id, parent, thread, forum, author, created, message, is_edited "
+
+	sqlStr = ReplaceSQL(sqlStr, "?")
+	if len(posts) > 0 {
+		rows, err := tx.Query(sqlStr, vals...)
+		if err != nil {
+			_ = tx.Rollback()
+			return nil, err
+		}
+		i := 0
+		for rows.Next() {
+			err := rows.Scan(
+				&(posts)[i].Id,
+				&(posts)[i].Parent,
+				&(posts)[i].Thread,
+				&(posts)[i].Forum,
+				&(posts)[i].Author,
+				&(posts)[i].Created,
+				&(posts)[i].Message,
+				&(posts)[i].IsEdited,
+			)
+			i += 1
+
+			if err != nil {
+				tx.Rollback()
+				return nil, err
+			}
+		}
+	}
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
+	}
+	return posts, nil
 }
+
+func ReplaceSQL(old, searchPattern string) string {
+	tmpCount := strings.Count(old, searchPattern)
+	for m := 1; m <= tmpCount; m++ {
+		old = strings.Replace(old, searchPattern, "$"+strconv.Itoa(m), 1)
+	}
+	return old
+}
+
 
 /*func (ps *PostService) CheckPosts(threadId int, posts []Post) (err error) {
 	_, err := h.UserService.FindUserByNickName(newPosts[i].Author)
 	if err != nil {
-		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find user"})
+		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can'ps find user"})
 	}
 	if newPosts[i].Parent != 0 {
 		err = h.PostService.FindPostById(newPosts[i].Parent, newPosts[i].Thread)
 		if err != nil {
-			return ctx.JSON(http.StatusConflict, forum.ErrorMessage{Message: "Can't find post"})
+			return ctx.JSON(http.StatusConflict, forum.ErrorMessage{Message: "Can'ps find post"})
 		}
 	}
 }*/
