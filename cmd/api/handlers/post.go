@@ -163,7 +163,7 @@ func (h *Post) CreatePosts(ctx echo.Context) error {
 	}*/
 	ids, err := h.PostService.CreatePosts(thread.Id, thread.Forum, createdTime, newPosts)
 	if err != nil {
-		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find user"})
+		return ctx.JSON(http.StatusBadRequest, forum.ErrorMessage{Message: "Unexpected error"})
 	}
 	for i := 0; i < len(newPosts); i++ {
 		newPosts[i].Thread = thread.Id

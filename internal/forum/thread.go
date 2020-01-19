@@ -177,7 +177,7 @@ func (ts *ThreadService) SelectThreadByForum(forum string, limit int, since stri
 		sqlQuery := `SELECT sum(v.voice)
 		FROM public.vote as v
 		where v.thread_id = $1`
-		err = ts.db.QueryRow(sqlQuery, threadScan.Title).Scan(&threadScan.Votes)
+		err = ts.db.QueryRow(sqlQuery, threadScan.Id).Scan(&threadScan.Votes)
 		threads = append(threads, threadScan)
 	}
 	return

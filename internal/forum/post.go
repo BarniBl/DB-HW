@@ -63,7 +63,7 @@ func (ps *PostService) CreatePosts(threadId int, postForum, created string, post
 		))
 	}
 	query := fmt.Sprintf(
-		"insert into post (thread, forum, parent, author, message, created) values %s",
+		"insert into public.post (thread, forum, parent, author, message, created) values %s",
 		strings.Join(placeholders, ","),
 	)
 	query = query + " RETURNING id"
