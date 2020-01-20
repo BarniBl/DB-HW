@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"github.com/BarniBl/DB-HW/internal/forum"
 	"github.com/jackc/pgx"
 	"github.com/labstack/echo"
@@ -150,36 +151,14 @@ func (h *Post) CreatePosts(ctx echo.Context) error {
 		return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find forum"})
 	}
 
-/*	for i := 0; i < len(newPosts); i++ {
-		user, err := h.UserService.FindUserByNickName(newPosts[i].Author)
-		if err != nil {
-			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find user"})
-		}
-		err = h.ForumService.InsertForumUser(forumPosts.Id, user.Id)
-		if newPosts[i].Parent != 0 {
-			err = h.PostService.FindPostById(newPosts[i].Parent, thread.Id)
-			if err != nil {
-				return ctx.JSON(http.StatusConflict, forum.ErrorMessage{Message: "Can't find post"})
-			}
-		}
-	}*/
-
 	posts, err := h.PostService.CreatePosts(thread,forumPosts.Id, createdTime, newPosts)
 	if err != nil {
 		if err.Error() == "404" {
 			return ctx.JSON(http.StatusNotFound, forum.ErrorMessage{Message: "Can't find post author by nickname:"})
 		}
-
+		fmt.Println(err)
 		return ctx.JSON(http.StatusConflict, forum.ErrorMessage{Message: "Parent post was created in another thread"})
 	}
-
-	/*	for i := 0; i < len(newPosts); i++ {
-		newPosts[i].Thread = thread.Id
-		newPosts[i].Forum = thread.Forum
-		newPosts[i].Created = createdTime
-		newPosts[i].Id = ids[i]
-		newPosts[i].IsEdited = false
-	}*/
 
 	err = h.ForumService.UpdatePostCount(thread.Forum, len(newPosts))
 	if err != nil {

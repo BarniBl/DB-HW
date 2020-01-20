@@ -53,32 +53,30 @@ func (ps *PostService) UpdatePostMessage(newMessage string, id int) (countUpdate
 }
 
 func (ps *PostService) CreatePosts(thread Thread, forumId int, created string, posts []Post) (post []Post, err error) {
-	tx, err := ps.db.Begin()
-	if err != nil {
-		return nil, err
-	}
+	/*	tx, err := ps.db.Begin()
+		if err != nil {
+			return nil, err
+		}
+	defer tx.Rollback()*/
 
-	//now := time.Now()
-
-	sqlStr := "INSERT INTO post(id, parent, thread, forum, author, created, message, path) VALUES "
+	sqlStr := "INSERT INTO public.post(id, parent, thread, forum, author, created, message, path) VALUES "
 	vals := []interface{}{}
 	for _, post := range posts {
 		var authorId int
-		err = ps.db.QueryRow(`SELECT id FROM public."user" WHERE LOWER(nick_name) = LOWER($1)`,
+		err = ps.db.QueryRow(`SELECT "user".id FROM public."user" WHERE LOWER("user".nick_name) = LOWER($1)`,
 			post.Author,
 		).Scan(&authorId)
 		if err != nil {
-			_ = tx.Rollback()
 			return nil, errors.New("404")
 		}
 		sqlQuery := `
 		INSERT INTO public.forum_user (forum_id, user_id)
 		VALUES ($1,$2)`
-		_, err = ps.db.Exec(sqlQuery, forumId, authorId)
+		_, _ = ps.db.Exec(sqlQuery, forumId, authorId)
 
 		if post.Parent == 0 {
-			sqlStr += "(nextval('post_id_seq'::regclass), ?, ?, ?, ?, ?, ?, " +
-				"ARRAY[currval(pg_get_serial_sequence('post', 'id'))::bigint]),"
+			sqlStr += "(nextval('public.post_id_seq'::regclass), ?, ?, ?, ?, ?, ?, " +
+				"ARRAY[currval(pg_get_serial_sequence('public.post', 'id'))::bigint]),"
 			vals = append(vals, post.Parent, thread.Id, thread.Forum, post.Author, created, post.Message)
 		} else {
 			var parentThreadId int32
@@ -86,17 +84,15 @@ func (ps *PostService) CreatePosts(thread Thread, forumId int, created string, p
 				post.Parent,
 			).Scan(&parentThreadId)
 			if err != nil {
-				_ = tx.Rollback()
 				return nil, err
 			}
 			if parentThreadId != int32(thread.Id) {
-				_ = tx.Rollback()
 				return nil, errors.New("Parent post was created in another thread")
 			}
 
-			sqlStr += " (nextval('post_id_seq'::regclass), ?, ?, ?, ?, ?, ?, " +
+			sqlStr += " (nextval('public.post_id_seq'::regclass), ?, ?, ?, ?, ?, ?, " +
 				"(SELECT post.path FROM public.post WHERE post.id = ? AND post.thread = ?) || " +
-				"currval(pg_get_serial_sequence('post', 'id'))::bigint),"
+				"currval(pg_get_serial_sequence('public.post', 'id'))::bigint),"
 
 			vals = append(vals, post.Parent, thread.Id, thread.Forum, post.Author, created, post.Message, post.Parent, thread.Id)
 		}
@@ -108,36 +104,31 @@ func (ps *PostService) CreatePosts(thread Thread, forumId int, created string, p
 
 	sqlStr = ReplaceSQL(sqlStr, "?")
 	if len(posts) > 0 {
-		rows, err := tx.Query(sqlStr, vals...)
+		rows, err := ps.db.Query(sqlStr, vals...)
 		if err != nil {
-			_ = tx.Rollback()
 			return nil, err
 		}
-		i := 0
+		scanPost := Post{}
 		for rows.Next() {
 			err := rows.Scan(
-				&(posts)[i].Id,
-				&(posts)[i].Parent,
-				&(posts)[i].Thread,
-				&(posts)[i].Forum,
-				&(posts)[i].Author,
-				&(posts)[i].Created,
-				&(posts)[i].Message,
-				&(posts)[i].IsEdited,
+				&scanPost.Id,
+				&scanPost.Parent,
+				&scanPost.Thread,
+				&scanPost.Forum,
+				&scanPost.Author,
+				&scanPost.Created,
+				&scanPost.Message,
+				&scanPost.IsEdited,
 			)
-			i += 1
-
 			if err != nil {
-				tx.Rollback()
+				rows.Close()
 				return nil, err
 			}
+			post = append(post, scanPost)
 		}
+		rows.Close()
 	}
-	err = tx.Commit()
-	if err != nil {
-		return nil, err
-	}
-	return posts, nil
+	return post, nil
 }
 
 func ReplaceSQL(old, searchPattern string) string {
@@ -147,7 +138,6 @@ func ReplaceSQL(old, searchPattern string) string {
 	}
 	return old
 }
-
 
 /*func (ps *PostService) CheckPosts(threadId int, posts []Post) (err error) {
 	_, err := h.UserService.FindUserByNickName(newPosts[i].Author)
